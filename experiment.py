@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('MacOSX')
 import copy
 import slab
 import pandas as pd
@@ -11,13 +13,14 @@ subject = "jakab"
 
 # standard_angle_conditions = [-4, -3, -2, -1, 0, 0, 1, 2, 3, 4]
 standard_angle_conditions = [0]
-comparison_angle_conditions = [-35, -25, -15, -5, -2, 2, 5, 15, 25, 35]
-standard_cue = "BOTH"
-comparison_cue = "BOTH"
+comparison_angle_conditions = [-35, -25, -15, -5, 5, 15, 25, 35]
+standard_cue = "ITD"
+comparison_cue = "ILD"
 n_reps = 10
 standard_center_frequency = comparison_center_frequency = 500
 ISI = 0.2
 save = True
+level = 70
 
 df_trial_sequence = data_handler.generate_trial_sequence(standard_angle_conditions, comparison_angle_conditions, n_reps)
 trial_counter = 0
@@ -29,8 +32,15 @@ for seq_idx, seq_row in df_trial_sequence.iterrows():
     standard_angle = seq_row["standard_angle"]
     comparison_angle = seq_row["comparison_angle"]
     trial_type = standard_cue + "-->" + comparison_cue
-    stim_type = "sine_wave"
-    standard_stim = slab.Binaural.tone(frequency=standard_center_frequency, duration=0.3, samplerate=44100).ramp(duration=0.05)
+    # stim_type = "sine_wave"
+    # standard_stim = slab.Binaural.tone(frequency=standard_center_frequency, duration=0.3, samplerate=44100).ramp(duration=0.05)
+    stim_type = "noise_filtered_third_octave"
+    standard_stim = slab.Binaural.whitenoise(duration=0.3, samplerate=44100)
+    low_cutoff = standard_center_frequency / (2 ** (1 / 6))
+    high_cutoff = standard_center_frequency * (2 ** (1 / 6))
+    standard_stim = standard_stim.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
+    standard_stim.level = level
+    standard_stim = standard_stim.ramp(duration=0.05)
     comparison_stim = copy.deepcopy(standard_stim)
     standard_stim = apply_cue(standard_stim, standard_cue, standard_angle, standard_center_frequency)
     comparison_stim = apply_cue(comparison_stim, comparison_cue, comparison_angle, comparison_center_frequency)

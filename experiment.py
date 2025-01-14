@@ -12,7 +12,7 @@ from sound_handler import apply_cue
 subject = "jakab"
 
 # standard_angle_conditions = [-4, -3, -2, -1, 0, 0, 1, 2, 3, 4]
-standard_angle_conditions = [0]
+standard_angle_conditions = [4]
 comparison_angle_conditions = [-35, -25, -15, -5, 5, 15, 25, 35]
 standard_cue = "ITD"
 comparison_cue = "ILD"

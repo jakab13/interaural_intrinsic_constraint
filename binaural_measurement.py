@@ -1,12 +1,16 @@
 import time
 from datetime import datetime
+import seaborn as sns
+import pandas as pd
 import slab
 import freefield
 import pathlib
 import os
+import matplotlib.pyplot as plt
 
-subject = "jakab"
-azimuth = 15
+subject = "kemar"
+azimuth = 45
+freqs = [400, 500, 600, 700, 800]
 
 SAMPLE_RATE = 48828
 
@@ -47,22 +51,56 @@ tone = slab.Sound.tone(duration=.5, level=90, frequency=centre_frequency).ramp()
 silence = slab.Sound.silence(duration=.5)
 
 sound = noise_broadband
-sound.level = 90
+sound.level = 80
 
-stims = [noise_broadband, noise_band_limited, tone]
+for _ in range(10):
+    rec = play_and_record_local(sound)
+    folder = "recordings"
+    filename = '_'.join(filter(None, (subject, "azi", str(azimuth))))
+    filepath = pathlib.Path(folder / pathlib.Path(subject) / str("azi_" + str(azimuth)) / pathlib.Path(filename +
+                                                                          datetime.now().strftime(
+                                                                              "_%Y-%m-%d-%H-%M-%S") + '.wav'))
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    rec.write(filepath)
+    time.sleep(0.1)
 
-for stim in stims:
-    for _ in range(10):
-        rec = play_and_record_local(stim)
-        itd = rec.itd()
-        print("itd:", itd)
-        folder = "recordings"
-        filename = '_'.join(filter(None, (subject, "azi", str(azimuth), "stim_type")))
-        filepath = pathlib.Path(folder / pathlib.Path(subject) / pathlib.Path(filename +
-                                                                              datetime.now().strftime(
-                                                                                  "_%Y-%m-%d-%H-%M-%S") + '.txt'))
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-        rec.write(filepath)
-        time.sleep(0.1)
+DIR_recs = DIR / "recordings"
+
+df_binaural_measurements = pd.DataFrame()
+for subject in os.listdir(DIR_recs):
+    for azimuth in os.listdir(DIR_recs / subject):
+        for i, filename in enumerate(os.listdir(DIR_recs / subject / azimuth)):
+            rec = slab.Binaural(DIR_recs / subject / azimuth / filename)
+            itd = rec.itd() / rec.samplerate
+            azimuth_int = int(azimuth[4:])
+            for freq in freqs:
+                low_cutoff = freq / (2 ** (1 / 6))
+                high_cutoff = freq * (2 ** (1 / 6))
+                rec = rec.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
+                ild = rec.ild()
+                binaural_current = {
+                    "filename": filename,
+                    "subject": subject,
+                    "azimuth": azimuth_int,
+                    "freq": freq,
+                    "itd": itd,
+                    "ild": ild,
+                    "rms": rec.level.mean(),
+                    "rms_left": rec.left.level,
+                    "rms_right": rec.right.level
+                }
+                df_binaural_measurements = df_binaural_measurements.append(binaural_current, ignore_index=True)
+                print("Computed binaural for", subject, "at", azimuth, "degrees","for rec", i + 1, "at", freq, 'Hz')
 
 
+df_binaural_measurements[df_binaural_measurements.azimuth == 0].groupby(["subject", "freq"])["ild"].mean()
+
+df_sub = df_binaural_measurements[df_binaural_measurements.subject == subject]
+
+fig, ax = plt.subplots(1, 2)
+sns.pointplot(data=df_sub, x="azimuth", y="rms_left", hue="freq", ax=ax[0])
+sns.pointplot(data=df_sub, x="azimuth", y="rms_right", hue="freq", ax=ax[1])
+plt.show()
+
+sns.pointplot(data=df_sub, x="azimuth", y="rms_left", hue="freq")
+plt.show()

@@ -6,7 +6,7 @@ import pathlib
 import os
 
 subject = "jakab"
-azimuth = 0
+azimuth = 15
 
 SAMPLE_RATE = 48828
 
@@ -47,16 +47,17 @@ tone = slab.Sound.tone(duration=.5, level=90, frequency=centre_frequency).ramp()
 silence = slab.Sound.silence(duration=.5)
 
 sound = noise_broadband
-sound.level = 100
+sound.level = 90
 
 stims = [noise_broadband, noise_band_limited, tone]
 
 for stim in stims:
     for _ in range(10):
-        rec = play_and_record_local(sound)
-        rec = rec.filter(frequency=50, kind="hp")
+        rec = play_and_record_local(stim)
+        itd = rec.itd()
+        print("itd:", itd)
         folder = "recordings"
-        filename = '_'.join(filter(None, (subject, "azi", azimuth, "stim_type")))
+        filename = '_'.join(filter(None, (subject, "azi", str(azimuth), "stim_type")))
         filepath = pathlib.Path(folder / pathlib.Path(subject) / pathlib.Path(filename +
                                                                               datetime.now().strftime(
                                                                                   "_%Y-%m-%d-%H-%M-%S") + '.txt'))

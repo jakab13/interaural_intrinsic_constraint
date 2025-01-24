@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import statsmodels
 
-path='./'
+path = "./"
 os.chdir(path)
 # Read text File
 def read_text_file(file_path):
@@ -38,7 +38,7 @@ for root, dirs, files in os.walk(folder_path):
         if ('.txt' in f):
             file_path = os.path.join(root, f)
             data = get_data(file_path)
-            trial = f.split('.txt')[0]
+            trial = f.split('.txt')[0]#.split('kirke')[1]#not necessary
 
             iter_df = pd.DataFrame(data, index=[trial] * len(data),
                                    columns=['subject', 'datetime_onset', 'stim_type', 'trial_type', 'trial_index',
@@ -55,14 +55,15 @@ for root, dirs, files in os.walk(folder_path):
             df = pd.concat([df, iter_df])
         else:
             pass
+#df['standard_angle_abs'] = df['standard_angle_abs'].astype(str).astype(int)
 
 combined_df = df.rename_axis('trial').reset_index()
 combined_df = combined_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 combined_df['comparison_angle_abs'] = pd.to_numeric(combined_df['comparison_angle_abs'], errors='coerce')
 combined_df['score_abs'] = pd.to_numeric(combined_df['score_abs'], errors='coerce')
 combined_df.sort_values(by='standard_center_frequency')
-#print(combined_df)
-#combined_df.to_csv('./merged.txt', sep='\t', index=False)
+print(combined_df)
+combined_df.to_csv('./merged_1.txt', sep='\t', index=False)
 
 
 # 3. calculate the psychometric function for each participant, for each "trial_type", for each "standard_angle"
@@ -102,11 +103,11 @@ palette= {'ILD-->ILD':'C1','ITD-->ITD':'C0','ILD-->ITD':'C2','ITD-->ILD':'C3'}
 pf = sns.FacetGrid(combined_df, row="standard_angle_abs", col="standard_center_frequency", hue="trial_type", margin_titles=True,
                    col_order=['600','1200'], row_order=['8','16'], hue_order=['ILD-->ILD','ITD-->ITD','ILD-->ITD','ITD-->ILD'],
                    palette=palette)
-#pf.map(sns.lineplot, "comparison_angle_abs", "score_abs", marker="o")
-pf.map(sns.regplot, "comparison_angle_abs", "score_abs", logistic=True, scatter=False, marker="o") #logistic- von 2 antworten funktion bilden, nur zwei y werte
-pf.set(xticks=[-45, -35, -25, -15, 0, 15,25,35,45])
+pf.map(sns.lineplot, "comparison_angle_abs", "score_abs", marker="o")
+#pf.map(sns.regplot, "comparison_angle_abs", "score_abs", logistic=True, scatter=False, marker="o") #logistic- von 2 antworten funktion bilden, nur zwei y werte
 pf.set_xlabels(label='Comparison angle')
 pf.set_ylabels(label='Score')
+pf.set(xticks=[-45, -35, -25, -15, 0, 15,25,35,45])
 pf.add_legend()
 axes=pf.axes.flatten()
 #axes[0].set_title("400 Hz")
@@ -117,3 +118,21 @@ axes[1].set_title("1200 Hz")
 pf.savefig('./figures/pilot_3_angle_points')
 plt.show()
 
+
+#5. plot width against frequencies for all subjects in one plot, each width is one point
+palette= {'ILD-->ILD':'C1','ITD-->ITD':'C0','ILD-->ITD':'C2','ITD-->ILD':'C3'}
+
+sns.lineplot(    #lineplot
+    data=df_model,
+    x='standard_angle_abs',
+    y='width',
+    style='standard_center_frequency',
+    hue='trial_type',
+    err_style='bars',
+    errorbar='ci',
+    marker='o',
+    palette=palette
+)
+
+plt.savefig('./figures/width_pilot_3')
+plt.show()

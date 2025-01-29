@@ -5,6 +5,7 @@ import freefield
 import pathlib
 import os
 import pandas as pd
+from analyze_binaural import get_binaural_data_row, save_binaural_data, process_binaural
 
 
 SAMPLE_RATE = 48828
@@ -23,6 +24,7 @@ def initialize():
 
 def play_and_record_local(sound, speaker):
     freefield.write(tag="playbuflen", value=sound.n_samples, processors=["RX81", "RX82"])
+    # freefield.write(tag="playbuflen", value=sound.n_samples, processors=["RX81", "RX82"])
     n_delay = freefield.get_recording_delay(play_from="RX8", rec_from="RP2")
     n_delay += 50  # make the delay a bit larger to avoid missing the sound's onset
     rec_n_samples = int(sound.duration * recording_samplerate)
@@ -47,35 +49,11 @@ def get_rec_file_path(subject, azimuth, centre_frequency):
     return filepath
 
 
-def get_binaural_data_row(filepath, subject, azimuth, centre_frequency):
-    rec = slab.Binaural(filepath)
-    low_cutoff = centre_frequency / (2 ** (1 / 6))
-    high_cutoff = centre_frequency * (2 ** (1 / 6))
-    rec_filt = rec.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
-    itd = rec_filt.itd() / rec.samplerate
-    ild = rec_filt.ild()
-    rms = rec_filt.level.mean(),
-    rms_left = rec_filt.left.level,
-    rms_right = rec_filt.right.level
-    binaural_current = {
-        "sound_filename": filepath.name,
-        "subject": subject,
-        "azimuth": azimuth,
-        "freq": centre_frequency,
-        "itd": itd,
-        "ild": ild,
-        "rms": rms,
-        "rms_left": rms_left,
-        "rms_right": rms_right
-    }
-    return binaural_current
-
-
-def record_sounds(subject=None, speaker_ids=[2, 8, 15, 23, 31, 38, 44], freqs=[400, 600, 800, 1000, 1200], n_reps=5):
+def record_sounds(subject=None, speaker_ids=[2, 8, 15, 23, 31, 38, 44], freqs=[600, 800, 1000, 1200], n_reps=3):
     if subject is None:
         print("You haven't specified a subject")
     else:
-        df_binaural_measurements = pd.DataFrame()
+        df_binaural_data = pd.DataFrame()
         for speaker_id in speaker_ids:
             speaker = freefield.pick_speakers(speaker_id)[0]
             azimuth = speaker.azimuth
@@ -86,7 +64,7 @@ def record_sounds(subject=None, speaker_ids=[2, 8, 15, 23, 31, 38, 44], freqs=[4
                     noise_band_limited = slab.Sound.whitenoise(duration=.5, level=90).filter(frequency=(low_cutoff, high_cutoff),
                                                                                              kind="bp").ramp()
                     sound = noise_band_limited
-                    sound.level = 90
+                    sound.level = 92
 
                     rec = play_and_record_local(sound, speaker)
                     filepath = get_rec_file_path(subject, azimuth, centre_frequency)
@@ -94,9 +72,9 @@ def record_sounds(subject=None, speaker_ids=[2, 8, 15, 23, 31, 38, 44], freqs=[4
                     rec.write(filepath, normalise=False)
 
                     row = get_binaural_data_row(filepath, subject, azimuth, centre_frequency)
-                    df_binaural_measurements = df_binaural_measurements.append(row, ignore_index=True)
+                    df_binaural_data = df_binaural_data.append(row, ignore_index=True)
                     time.sleep(0.1)
-        data_folder = "binaural_data"
-        data_filepath = pathlib.Path(data_folder / pathlib.Path(subject + datetime.now().strftime("_%Y-%m-%d-%H-%M-%S") + '.csv'))
-        data_filepath.parent.mkdir(parents=True, exist_ok=True)
-        df_binaural_measurements.to_csv(data_filepath)
+            print(f"Finished recording at azimuth angle: {azimuth}")
+        df_post_proc_binaural_data = process_binaural(df_binaural_data)
+        save_binaural_data(df_post_proc_binaural_data)
+        print("Done saving binaural data")

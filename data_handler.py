@@ -39,8 +39,10 @@ def get_columns():
         "response",
         "is_correct",
         "score",
+        'score_abs',
         "standard_angle_abs",
-        "reaction_time"
+        "reaction_time",
+        'comparison_angle_abs'
     ]
     return column_names
 

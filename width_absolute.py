@@ -4,9 +4,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-import statsmodels
 
-path='./'
+path='.'
 os.chdir(path)
 # Read text File
 def read_text_file(file_path):
@@ -30,7 +29,7 @@ def get_data(file_path):
 
 df = pd.DataFrame(columns = ['subject','datetime_onset','stim_type','trial_type','trial_index','standard_angle','standard_value','standard_cue','standard_center_frequency','comparison_angle','comparison_value','comparison_cue','comparison_center_frequency','standard_order','comparison_order','solution','inter_stimulus_interval','response','is_correct','score', 'score_abs', 'standard_angle_abs','reaction_time', 'comparison_angle_abs'])
 
-folder_path='./Results/pilot_3_angle'
+folder_path='./Results/test'
 for root, dirs, files in os.walk(folder_path):
     for f in files:
         if ('.txt' in f):
@@ -91,18 +90,21 @@ df_model.to_csv('./psychometric_results.csv', index=False)
 
 #plot width against frequencies for all subjects in one plot, each width is one point
 palette= {'ILD-->ILD':'C1','ITD-->ITD':'C0','ILD-->ITD':'C2','ITD-->ILD':'C3'}
+pf = sns.FacetGrid(df_model, col="standard_center_frequency", col_order=['800','1200'], hue="trial_type",
+                   margin_titles=True, hue_order=['ILD-->ILD','ITD-->ITD','ILD-->ITD','ITD-->ILD'],
+                   palette=palette)
+pf.map(sns.regplot,'standard_angle_abs','width', marker='o', line_kws={'linestyle':'dashed'}) #'threshold'
 
-sns.lineplot(    
-    data=df_model,
-    x='standard_angle_abs',
-    y='width',
-    style='standard_center_frequency',
-    hue='trial_type',
-    err_style='bars',
-    errorbar='ci',
-    marker='o',
-    palette=palette
-)
-plt.savefig('./figures/width_pilot_3')
+x = np.linspace(0, 12, 12)
+y = x
+
+# add line for threshold
+#for ax in pf.axes.flat:
+ #   ax.plot(x, y, linestyle='solid', color='grey', label="y = x")  # Feste Linie in Rot
+
+
+pf.add_legend()
+
+plt.savefig('./figures/width')
 plt.show()
 

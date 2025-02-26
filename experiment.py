@@ -2,22 +2,22 @@ import matplotlib
 matplotlib.use('MacOSX')
 import copy
 import slab
-import pandas as pd
 import numpy as np
 import datetime
 import time
 import data_handler
 from sound_handler import apply_cue
 
-subject = "jakab"
+subject = "jakab_matched_12_ITD"
 
 # standard_angle_conditions = [-4, -3, -2, -1, 0, 0, 1, 2, 3, 4]
-standard_angle_conditions = [4]
-comparison_angle_conditions = [-35, -25, -15, -5, 5, 15, 25, 35]
+standard_angle_conditions = [12]
+# comparison_angle_conditions = np.asarray([-25, -15, -5, 5, 15, 25])
+comparison_angle_conditions = np.asarray([-5, 0, 5, 10, 15])
 standard_cue = "ITD"
 comparison_cue = "ILD"
-n_reps = 10
-standard_center_frequency = comparison_center_frequency = 500
+n_reps = 3
+standard_center_frequency = comparison_center_frequency = 1200
 ISI = 0.2
 save = True
 level = 70
@@ -40,7 +40,7 @@ for seq_idx, seq_row in df_trial_sequence.iterrows():
     high_cutoff = standard_center_frequency * (2 ** (1 / 6))
     standard_stim = standard_stim.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
     standard_stim.level = level
-    standard_stim = standard_stim.ramp(duration=0.05)
+    standard_stim = standard_stim.ramp(duration=0.01)
     comparison_stim = copy.deepcopy(standard_stim)
     standard_stim = apply_cue(standard_stim, standard_cue, standard_angle, standard_center_frequency)
     comparison_stim = apply_cue(comparison_stim, comparison_cue, comparison_angle, comparison_center_frequency)

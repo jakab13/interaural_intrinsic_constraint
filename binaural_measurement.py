@@ -25,6 +25,11 @@ proc_list = [['RP2', 'RP2',  DIR/'rcx'/'bi_rec_buf.rcx'],
 freefield.initialize('dome', zbus=True, device=proc_list)
 
 
+def list_dir_local(path):
+    current_list = [f for f in os.listdir(path) if not f.startswith(".")]
+    current_list = [f for f in current_list if "Icon" not in f]
+    return current_list
+
 def play_and_record_local(sound, speaker):
     freefield.write(tag="playbuflen", value=sound.n_samples, processors=["RX81", "RX82"])
     n_delay = freefield.get_recording_delay(play_from="RX8", rec_from="RP2")
@@ -67,16 +72,16 @@ for speaker_id in speaker_ids:
             time.sleep(0.1)
 
 DIR_recs = DIR / "recordings"
-subjects = os.listdir(DIR_recs)
-subjects = [subject]
+subjects = [f for f in os.listdir(DIR_recs) if not f.startswith(".")]
+# subjects = [subject]
 
-# df_binaural_measurements = pd.DataFrame()
+df_binaural_measurements = pd.DataFrame()
 # freqs = [centre_frequency]
 
 for subject in subjects:
-    for azi in os.listdir(DIR_recs / subject):
-        for freq in os.listdir(DIR_recs / subject / azi):
-            for i, filename in enumerate(os.listdir(DIR_recs / subject / azi / freq)):
+    for azi in list_dir_local(DIR_recs / subject):
+        for freq in list_dir_local(DIR_recs / subject / azi):
+            for i, filename in enumerate(list_dir_local(DIR_recs / subject / azi / freq)):
                 rec = slab.Binaural(DIR_recs / subject / azi / freq / filename)
                 azimuth_float = float(azi[4:])
                 freq_float = float(freq)
@@ -96,17 +101,39 @@ for subject in subjects:
                     "rms_left": rec.left.level,
                     "rms_right": rec.right.level
                 }
-                df_binaural_measurements = df_binaural_measurements.append(binaural_current, ignore_index=True)
+                df_binaural_measurements = pd.concat([df_binaural_measurements, pd.DataFrame([binaural_current])], ignore_index=True)
                 print("Computed binaural for", subject, "at", azi, "degrees","for rec", i + 1, "at", freq, 'Hz')
 
 
-df_binaural_measurements[df_binaural_measurements.azimuth == 0].groupby(["subject", "freq"])["ild", "itd"].mean()
-df_binaural_measurements.groupby(["subject", "freq", "azimuth"])["ild", "itd"].mean()
+# df_binaural_measurements.to_csv("binaural_measurements.csv")
 
-g = sns.FacetGrid(data=df_binaural_measurements, row="freq", col="subject", sharey=False)
-g.map(sns.lineplot, "azimuth", "rms_left", marker="o", color="g")
-g.map(sns.lineplot, "azimuth", "rms_right", marker="o", color="r")
-# g.map(sns.lineplot, "azimuth", "ild", marker="o", color="b")
+df_binaural_measurements = pd.read_csv("binaural_measurements.csv")
+
+# df_binaural_measurements[df_binaural_measurements.azimuth == 0].groupby(["subject", "freq"])["ild", "itd"].mean()
+# df_binaural_measurements.groupby(["subject", "freq", "azimuth"])["ild", "itd"].mean()
+
+def norm_rms(row, channel="left"):
+    subject = row.subject
+    freq = row.freq
+    rms_name = "rms_" + channel
+    rms_base = df_binaural_measurements[(df_binaural_measurements.subject == subject) &
+                                       (df_binaural_measurements.freq == freq) &
+                                       (df_binaural_measurements.azimuth == 0)][rms_name].mean()
+    rms_val = row[rms_name] - rms_base
+    return rms_val
+
+df_binaural_measurements["rms_left_norm"] = df_binaural_measurements.apply(lambda row: norm_rms(row, channel="left"), axis=1)
+df_binaural_measurements["rms_right_norm"] = df_binaural_measurements.apply(lambda row: norm_rms(row, channel="right"), axis=1)
+
+df_binaural_measurements.loc[df_binaural_measurements.azimuth == -17.5, "azimuth"] = -8.725
+# df_binaural_measurements.loc[df_binaural_measurements.azimuth == 17.5, "azimuth"] = 8.725
+
+df_binaural_measurements_high = df_binaural_measurements[df_binaural_measurements.freq > 700]
+df_binaural_measurements_low = df_binaural_measurements[df_binaural_measurements.freq < 700]
+
+g = sns.FacetGrid(data=df_binaural_measurements_high, row="freq", col="subject")
+# g.map(sns.lineplot, "azimuth", "rms_left_norm", marker="o", color="g")
+g.map(sns.lineplot, "azimuth", "rms_right_norm", marker="o", color="r")
 plt.show()
 
 g = sns.FacetGrid(data=df_binaural_measurements, hue="freq", col="subject", palette="copper")
@@ -132,3 +159,4 @@ plt.show()
 
 sns.lineplot(data=df_sub, x="azimuth", y="ild", hue="freq", marker="o")
 plt.show()
+

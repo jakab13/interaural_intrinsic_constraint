@@ -8,15 +8,16 @@ import time
 import data_handler
 from sound_handler import apply_cue
 
-subject = "jakab_matched_12_ITD"
+subject = "jakab_matched_single"
 
 # standard_angle_conditions = [-4, -3, -2, -1, 0, 0, 1, 2, 3, 4]
-standard_angle_conditions = [12]
-# comparison_angle_conditions = np.asarray([-25, -15, -5, 5, 15, 25])
-comparison_angle_conditions = np.asarray([-5, 0, 5, 10, 15])
+standard_angle_conditions = [0]
+# comparison_angle_conditions = np.asarray([-25, -15, -10, -5, 5, 10, 15, 25])
+comparison_angle_conditions = np.asarray([-15, -10, -5, 0, 5, 10, 15])
 standard_cue = "ITD"
-comparison_cue = "ILD"
-n_reps = 3
+comparison_cue = "ITD"
+stim_type = "noise_filtered_third_octave"
+n_reps = 5
 standard_center_frequency = comparison_center_frequency = 1200
 ISI = 0.2
 save = True
@@ -32,16 +33,25 @@ for seq_idx, seq_row in df_trial_sequence.iterrows():
     standard_angle = seq_row["standard_angle"]
     comparison_angle = seq_row["comparison_angle"]
     trial_type = standard_cue + "-->" + comparison_cue
-    # stim_type = "sine_wave"
-    # standard_stim = slab.Binaural.tone(frequency=standard_center_frequency, duration=0.3, samplerate=44100).ramp(duration=0.05)
-    stim_type = "noise_filtered_third_octave"
-    standard_stim = slab.Binaural.whitenoise(duration=0.3, samplerate=44100)
     low_cutoff = standard_center_frequency / (2 ** (1 / 6))
     high_cutoff = standard_center_frequency * (2 ** (1 / 6))
+
+    standard_stim = slab.Binaural.whitenoise(duration=0.3, samplerate=44100)
+    # standard_stim_l = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # standard_stim_r = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # standard_stim = slab.Binaural([standard_stim_l, standard_stim_r])
     standard_stim = standard_stim.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
     standard_stim.level = level
     standard_stim = standard_stim.ramp(duration=0.01)
+
+    # comparison_stim_l = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # comparison_stim_r = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # comparison_stim = slab.Binaural([comparison_stim_l, comparison_stim_r])
+    # comparison_stim = comparison_stim.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
+    # comparison_stim.level = level
+    # comparison_stim = comparison_stim.ramp(duration=0.01)
     comparison_stim = copy.deepcopy(standard_stim)
+
     standard_stim = apply_cue(standard_stim, standard_cue, standard_angle, standard_center_frequency)
     comparison_stim = apply_cue(comparison_stim, comparison_cue, comparison_angle, comparison_center_frequency)
     presentations = [standard_stim, comparison_stim]

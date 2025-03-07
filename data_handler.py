@@ -7,7 +7,7 @@ def generate_trial_sequence(standard_angle_conditions, comparison_angle_conditio
         for comparison_angle in comparison_angle_conditions:
             for n in range(n_reps):
                 trial = {
-                    "standard_angle": standard_angle,
+                    "standard_angle": standard_angle if n < n_reps/2 else -abs(standard_angle),
                     "comparison_angle": comparison_angle
                 }
                 df_trial = pd.DataFrame.from_dict([trial])
@@ -39,8 +39,10 @@ def get_columns():
         "response",
         "is_correct",
         "score",
+        'score_abs',
         "standard_angle_abs",
-        "reaction_time"
+        "reaction_time",
+        'comparison_angle_abs'
     ]
     return column_names
 

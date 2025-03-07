@@ -91,6 +91,15 @@ for seq_idx, seq_row in df_trial_sequence.iterrows():
         score = int(is_correct)
     elif is_comparison_to_the_right == 0:
         score = 1 - int(is_correct)
+    comparison_angle_abs = comparison_angle * -1 if standard_angle < 0 else comparison_angle
+
+    if standard_angle < 0 and score == 0:
+        score_abs = score + 1
+    elif standard_angle < 0 and score == 1:
+        score_abs = score - 1
+    else:
+        score_abs = score
+
     trial_counter += 1
     if save:
         row = results_table.Row(
@@ -114,8 +123,10 @@ for seq_idx, seq_row in df_trial_sequence.iterrows():
             response=response,
             is_correct=is_correct,
             score=score,
+            score_abs=score_abs,
             standard_angle_abs=abs(standard_angle),
-            reaction_time=reaction_time
+            reaction_time=reaction_time,
+            comparison_angle_abs=comparison_angle_abs
         )
         results_table.write(row)
     time.sleep(.5)

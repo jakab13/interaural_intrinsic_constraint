@@ -35,8 +35,6 @@ def make_interaural_level_spectrum():
         ils['level_diffs_right'][:, n] = noise_0_bank.level - noise_bank_right.level
         ils['level_diffs_left'][:, n] = noise_0_bank.level - noise_bank_left.level
     return ils
-#
-#
 # ils = make_interaural_level_spectrum()
 
 
@@ -58,7 +56,7 @@ def apply_cue(stim, cue, angle, filter_frequency, head_radius=7.5):
     if cue == "ITD" or cue == "BOTH":
         itd_val = slab.Binaural.azimuth_to_itd(angle, frequency=filter_frequency, head_radius=head_radius)
         sound = sound.itd(itd_val)
-    elif cue == "ILD" or cue == "BOTH":
+    if cue == "ILD" or cue == "BOTH":
         # ild_val = slab.Binaural.azimuth_to_ild(angle, frequency=filter_frequency, ils=ils)
         # sound = sound.ild(ild_val).externalize()
         ild_vals = azimuth_to_ild(angle, frequency=filter_frequency, ils=ils)

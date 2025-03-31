@@ -7,8 +7,14 @@ import slab
 DIR = pathlib.Path(os.getcwd())
 DIR_recs = DIR / "recordings"
 
-def get_binaural_data_row(filepath, subject, azimuth, centre_frequency):
-    rec = slab.Binaural(filepath)
+def get_binaural_data_row(subject, azimuth, centre_frequency):
+    folder_path = DIR_recs / subject / f'azi_{azimuth}' / str(centre_frequency)
+    filepaths = list(folder_path.glob('*.wav'))
+    if len(filepaths) < 10:
+        return None
+
+    recs = [slab.Binaural(str(fp)) for fp in filepaths]
+    rec = sum(recs) / len(recs)
     low_cutoff = centre_frequency / (2 ** (1 / 6))
     high_cutoff = centre_frequency * (2 ** (1 / 6))
     rec_filt = rec.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
@@ -21,7 +27,7 @@ def get_binaural_data_row(filepath, subject, azimuth, centre_frequency):
     rms_left = rec_filt.left.level
     rms_right = rec_filt.right.level
     binaural_current = {
-        "sound_filename": filepath.name,
+        "sound_filename":','.join([fp.name for fp in filepaths]),
         "subject": subject,
         "azimuth": azimuth,
         "freq": centre_frequency,

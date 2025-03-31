@@ -1,25 +1,27 @@
-import slab
 import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-import pandas as pd
+matplotlib.use('MacOSX')
+import copy
+import slab
 import numpy as np
 import datetime
 import time
 import data_handler
 from sound_handler import apply_cue
 
-subject = "subject"
+subject = "jakab_matched_single"
 
-standard_angle_conditions = [8]
-comparison_angle_conditions = [-35,-25,-15,-5,5,15,25,35]
-standard_cue = "ILD"
+# standard_angle_conditions = [-4, -3, -2, -1, 0, 0, 1, 2, 3, 4]
+standard_angle_conditions = [0]
+# comparison_angle_conditions = np.asarray([-25, -15, -10, -5, 5, 10, 15, 25])
+comparison_angle_conditions = np.asarray([-15, -10, -5, 0, 5, 10, 15])
+standard_cue = "ITD"
 comparison_cue = "ITD"
-n_reps = 20
-standard_center_frequency = comparison_center_frequency = 1500 #1700, 200
+stim_type = "noise_filtered_third_octave"
+n_reps = 5
+standard_center_frequency = comparison_center_frequency = 1200
 ISI = 0.2
 save = True
-level = 75
+level = 70
 
 df_trial_sequence = data_handler.generate_trial_sequence(standard_angle_conditions, comparison_angle_conditions, n_reps)
 trial_counter = 0
@@ -31,24 +33,25 @@ for seq_idx, seq_row in df_trial_sequence.iterrows():
     standard_angle = seq_row["standard_angle"]
     comparison_angle = seq_row["comparison_angle"]
     trial_type = standard_cue + "-->" + comparison_cue
-    # stim_type = "sine_wave"
-    #standard_stim = slab.Binaural.tone(frequency=standard_center_frequency, duration=0.3, samplerate=44100).ramp(duration=0.05)
-    stim_type = "noise_filtered_third_octave"
-    standard_stim = slab.Binaural.whitenoise(duration=15435, samplerate=44100)  #(0.35s)
-    comparison_stim = slab.Binaural.whitenoise(duration=15435, samplerate=44100) #(0.35s)
-    standard_stim[13230:15435] = 0  # last 0.05s set to 0
-    comparison_stim[13230:15435] = 0
     low_cutoff = standard_center_frequency / (2 ** (1 / 6))
     high_cutoff = standard_center_frequency * (2 ** (1 / 6))
-    low_cutoff_com = comparison_center_frequency / (2 ** (1 / 6)) #new
-    high_cutoff_com = comparison_center_frequency * (2 ** (1 / 6)) #new
 
+    standard_stim = slab.Binaural.whitenoise(duration=0.3, samplerate=44100)
+    # standard_stim_l = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # standard_stim_r = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # standard_stim = slab.Binaural([standard_stim_l, standard_stim_r])
     standard_stim = standard_stim.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
     standard_stim.level = level
-    standard_stim = standard_stim.ramp(when='both', duration=0.05)
-    comparison_stim = comparison_stim.filter(frequency=(low_cutoff_com, high_cutoff_com), kind="bp")#copy.deepcopy(standard_stim)
-    comparison_stim.level=level
-    comparison_stim = comparison_stim.ramp(when='both', duration=0.05)
+    standard_stim = standard_stim.ramp(duration=0.01)
+
+    # comparison_stim_l = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # comparison_stim_r = slab.Sound.whitenoise(duration=0.3, samplerate=44100)
+    # comparison_stim = slab.Binaural([comparison_stim_l, comparison_stim_r])
+    # comparison_stim = comparison_stim.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
+    # comparison_stim.level = level
+    # comparison_stim = comparison_stim.ramp(duration=0.01)
+    comparison_stim = copy.deepcopy(standard_stim)
+
     standard_stim = apply_cue(standard_stim, standard_cue, standard_angle, standard_center_frequency)
     comparison_stim = apply_cue(comparison_stim, comparison_cue, comparison_angle, comparison_center_frequency)
     presentations = [standard_stim, comparison_stim]

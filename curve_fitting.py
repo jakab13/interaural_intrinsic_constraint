@@ -6,6 +6,8 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
+
+
 df = pd.read_csv('C:/Users/km49dola/Desktop/ma/recordings/kemar/kemar99/kemar99_2025-03-28-09-47-51.csv')
 subject= 'kemar81'
 unique_freqs = df.iloc[:, 1].unique()

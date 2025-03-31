@@ -50,7 +50,6 @@ def azimuth_to_ild(azimuth, frequency=2000, ils=None):
     ild_left = np.interp(frequency, ils['frequencies'], levels_left) * -1
     return [ild_right, ild_left]  # interpolate level difference at frequency
 
-
 def apply_cue(stim, cue, angle, filter_frequency, head_radius=7.5):
     sound = copy.deepcopy(stim)
     if cue == "ITD" or cue == "BOTH":

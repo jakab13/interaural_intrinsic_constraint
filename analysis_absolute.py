@@ -7,7 +7,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 path = './'
 os.chdir(path)
 # Read text File
@@ -93,7 +92,7 @@ df_model = df_group.apply(
 # 4. store the results (mean, slope) of the psychometric fit in the same data sheet
 df_model.to_csv('./kirke_pses_8_1500_cue_matching.csv', index=False)
 
-# 5. plot psychometric functions in a Facetgrid using the seaborn library
+# 5. plot psychometric functions in Facetgrid using the seaborn library
 palette = sns.color_palette('Paired')
 #palette= {'ILD-->ILD':'C1','ITD-->ITD':'C0','ILD-->ITD':'C2','ITD-->ILD':'C3'}
 pf = sns.FacetGrid(combined_df, hue="trial_type", margin_titles=True

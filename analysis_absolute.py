@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-import statsmodels
+#import statsmodels
 
 path = "./"
 os.chdir(path)
@@ -119,7 +119,7 @@ pf.savefig('./figures/pilot_3_angle_points')
 plt.show()
 
 
-#5. plot width against frequencies for all subjects in one plot, each width is one point
+#6. plot width against frequencies for all subjects in one plot, each width is one point
 palette= {'ILD-->ILD':'C1','ITD-->ITD':'C0','ILD-->ITD':'C2','ITD-->ILD':'C3'}
 
 sns.lineplot(    #lineplot

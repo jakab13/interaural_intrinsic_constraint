@@ -19,7 +19,6 @@ for file in os.listdir():
         file_path = f"{path}/{file}"
         read_text_file(file_path)
 
-
 #2. generate one large "master" file that contains all the recordings of the experiments
 
 # processing individual text files

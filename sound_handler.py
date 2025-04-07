@@ -35,6 +35,8 @@ def make_interaural_level_spectrum():
         ils['level_diffs_right'][:, n] = noise_0_bank.level - noise_bank_right.level
         ils['level_diffs_left'][:, n] = noise_0_bank.level - noise_bank_left.level
     return ils
+#
+#
 # ils = make_interaural_level_spectrum()
 
 
@@ -51,7 +53,7 @@ def azimuth_to_ild(azimuth, frequency=2000, ils=None):
     return [ild_right, ild_left]  # interpolate level difference at frequency
 
 
-def apply_cue(stim, cue, angle, filter_frequency, head_radius=7.5):
+def apply_cue(stim, cue, angle, filter_frequency, head_radius=8):
     sound = copy.deepcopy(stim)
     if cue == "ITD" or cue == "BOTH":
         itd_val = slab.Binaural.azimuth_to_itd(angle, frequency=filter_frequency, head_radius=head_radius)

@@ -7,6 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
+subject= 'kirke_1300_16'
 path = './'
 os.chdir(path)
 # Read text File
@@ -30,7 +31,7 @@ def get_data(file_path):
 
 df = pd.DataFrame(columns = ['subject','datetime_onset','stim_type','trial_type','trial_index','standard_angle','standard_value','standard_cue','standard_center_frequency','comparison_angle','comparison_value','comparison_cue','comparison_center_frequency','standard_order','comparison_order','solution','inter_stimulus_interval','response','is_correct','score', 'score_abs', 'standard_angle_abs','reaction_time', 'comparison_angle_abs'])
 
-folder_path='./Results/kirke_pses_8_1500_cue_matching'
+folder_path=f"./Results/{subject}"
 for root, dirs, files in os.walk(folder_path):
     for f in files:
         if ('.txt' in f):
@@ -61,7 +62,7 @@ combined_df['comparison_angle_abs'] = pd.to_numeric(combined_df['comparison_angl
 combined_df['score_abs'] = pd.to_numeric(combined_df['score_abs'], errors='coerce')
 combined_df.sort_values(by='standard_center_frequency')
 print(combined_df)
-combined_df.to_csv('./merged_test.txt', sep='\t', index=False)
+combined_df.to_csv(f"./merged_tables/{subject}.txt", sep='\t', index=False) #'./merged_tables/merged_kirke_1300_16.txt'
 
 
 # 3. calculate the psychometric function for each participant, for each "trial_type", for each "standard_angle"
@@ -89,7 +90,7 @@ df_model = df_group.apply(
     ).reset_index()
 
 # 4. store the results (mean, slope) of the psychometric fit in the same data sheet
-df_model.to_csv('./kirke_pses_8_1500_cue_matching.csv', index=False)
+df_model.to_csv( f"./psychometric_results/{subject}.csv", index=False) #'./kirke_1300_16.csv'
 
 # 5. plot psychometric functions in Facetgrid using the seaborn library
 palette = sns.color_palette('Paired')
@@ -110,5 +111,5 @@ axes=pf.axes.flatten()
 #axes[3].set_title("700 Hz")
 #axes[1].set_title("1500 Hz")
 #pf.map(plt.axvline, comparison_angle_abs='standard_angle_abs', color="black", line_kws={'linestyle':'dashed'})
-pf.savefig('./figures/kirke_pses_8_1500_cue_matching')
+pf.savefig(f"./figures_pilot/{subject}")
 plt.show()

@@ -19,7 +19,7 @@ sns.set_style("white")
 DIR = Path(os.getcwd())
 
 # subject = "jakab_matched_single"
-subject = "jakab"
+subject = "jakab_matched_ITD_10"
 
 folder_path = "/Users/jakabpilaszanovich/Documents/GitHub/interaural_intrinsic_constraint/Results/" + subject
 # Get all CSV files and sort by modification time
@@ -36,14 +36,17 @@ for file in csv_files:
     dataframes.append(df)
 combined_df = pd.concat(dataframes, ignore_index=True)
 combined_df = combined_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+# combined_df = combined_df[~(combined_df.comparison_angle_abs == 40)]
+# combined_df["mixing_gain"] = combined_df.apply(lambda row: int(row["stim_type"][-3:-1]), axis=1)
 
-combined_df = combined_df[(combined_df.stim_type == "noise_filtered_third_octave")]
+# combined_df = combined_df[(combined_df.stim_type == "noise_filtered_third_octave")]
 # combined_df = combined_df[~(combined_df.comparison_angle == -2)]
 # combined_df = combined_df[~(combined_df.comparison_angle == 2)]
 # combined_df = combined_df[~(combined_df.standard_angle == 24)]
 # combined_df = combined_df[~(combined_df.standard_center_frequency == 80)]
 # combined_df = combined_df[~(combined_df.standard_center_frequency == 125)]
 # combined_df = combined_df[~(combined_df.standard_center_frequency == 250)]
+
 combined_df = combined_df[
     # (combined_df.standard_center_frequency == 400) |
     (combined_df.standard_center_frequency == 500) |
@@ -64,6 +67,8 @@ combined_df = combined_df[
 # ]
 # combined_df = combined_df[~(combined_df.standard_center_frequency == 1000)]
 # combined_df = combined_df[~(combined_df.trial_type == "BOTH-->BOTH")]
+
+# combined_df = combined_df[(combined_df.standard_angle == 16)]
 
 def get_cue_combination(row):
     trial_type_string = row.trial_type.split("-->")
@@ -128,7 +133,7 @@ combined_df["cue_combination"] = combined_df.apply(lambda row: get_cue_combinati
 # # plt.savefig("Cue matching - single cue", dpi=200)
 
 
-# g = sns.FacetGrid(combined_df,
+#g = sns.FacetGrid(combined_df,
 #                   hue="trial_type", col="standard_center_frequency",
 #                 hue_order=["ILD-->ILD", "ITD-->ITD"], row="standard_angle"
 #                   )
@@ -137,6 +142,33 @@ combined_df["cue_combination"] = combined_df.apply(lambda row: get_cue_combinati
 # g.map(sns.lineplot, "comparison_angle", "score", marker="o",
 #       errorbar=None
 #       )
+# g.add_legend()
+
+combined_df = combined_df[
+    ~(combined_df.comparison_angle == 7)
+    & ~(combined_df.comparison_angle == 9)
+]
+
+# combined_df = combined_df[
+#     ~(combined_df.mixing_gain == 25)
+#     & ~(combined_df.mixing_gain == 35)
+#     & ~(combined_df.mixing_gain == 45)
+# ]
+
+# g = sns.FacetGrid(combined_df,
+#                   hue="mixing_gain",
+#                   col="standard_center_frequency",
+#                   palette="mako",
+#                   row="trial_type",
+#                   row_order=["ILD-->ILD", "ITD-->ILD",
+#                              # "ILD-->BOTH"
+#                              "BOTH-->ILD"
+#                              ]
+#                   )
+# g.refline(y=0.5, c="grey", alpha=.1)
+# g.refline(x=0, c="grey", alpha=.1)
+# # g.map(sns.lineplot, "comparison_angle", "score", marker="o", errorbar=None)
+# g.map(sns.regplot, "comparison_angle", "score", scatter=False, logistic=True, ci=None)
 # g.add_legend()
 
 
@@ -160,14 +192,14 @@ def add_grid_line_of_equality(g):
 
 def get_psychometric_means(g, save_fig=False):
     subject = g["subject"].unique()[0]
-    standard_angle = g["standard_angle"].unique()[0]
+    standard_angle = g["standard_angle_abs"].unique()[0]
     standard_center_frequency = g["standard_center_frequency"].unique()[0]
-    stim_type = g["stim_type"].unique()[0]
+    # stim_type = g["stim_type"].unique()[0]
     trial_type = g["trial_type"].unique()[0]
     title = f"{subject}_{standard_center_frequency}_{trial_type}_{int(standard_angle)}"
     ps_result_file_path = DIR / Path("ps_results") / Path(subject) / Path(title + ".json")
-    data = g.groupby("comparison_angle", as_index=False).agg(
-        {"score": "sum", g.columns[0]: "count"}).rename(
+    data = g.groupby("comparison_angle_abs", as_index=False).agg(
+        {"score_abs": "sum", g.columns[0]: "count"}).rename(
         columns={g.columns[0]: 'n_total'})
     if ps_result_file_path.exists():
         res = ps.Result.load_json(ps_result_file_path)
@@ -206,6 +238,10 @@ def get_psychometric_means(g, save_fig=False):
     PSE_ci_95_high = res.confidence_intervals['threshold']["0.95"][1]
     # print(res)
 
+    # JND, JND_ci = res.threshold(0.84, unscaled=True)
+    # JND_ci_95_low = JND_ci['0.95'][0]
+    # JND_ci_95_high = JND_ci['0.95'][1]
+
     JND = res.parameters_estimate_mean["width"] / 2
     JND_ci_95_low = res.confidence_intervals['width']["0.95"][0] / 2
     JND_ci_95_high = res.confidence_intervals['width']["0.95"][1] / 2
@@ -221,7 +257,7 @@ def get_psychometric_means(g, save_fig=False):
     }
     return pd.Series(row)
 
-df_group = combined_df.groupby(["subject", "standard_angle", "standard_center_frequency", "trial_type", "stim_type"])
+df_group = combined_df.groupby(["subject", "standard_angle_abs", "standard_center_frequency", "trial_type"])
 df_model = df_group.apply(lambda g: get_psychometric_means(g, save_fig=True), include_groups=True).reset_index()
 
 # df_model = pd.read_csv("PSE_estimates_kirke.csv")
@@ -292,10 +328,10 @@ def get_regressions(g):
     }
     return pd.Series(row)
 
-df_model_regs = df_model.groupby(["subject", "standard_center_frequency", "trial_type"])\
-    .apply(get_regressions).reset_index()
-
-df_model = pd.merge(left=df_model, right=df_model_regs, on=["subject", "standard_center_frequency", "trial_type"])
+# df_model_regs = df_model.groupby(["subject", "standard_center_frequency", "trial_type"])\
+#     .apply(get_regressions).reset_index()
+#
+# df_model = pd.merge(left=df_model, right=df_model_regs, on=["subject", "standard_center_frequency", "trial_type"])
 
 
 def get_PSE_pred_reg(row):
@@ -414,12 +450,12 @@ def get_JND_pred_IC(row):
 
 # df_model["PSE_pred_reg"] = df_model.apply(lambda row: get_PSE_pred_reg(row), axis=1)
 # df_model["PSE_pred_IC"] = df_model.apply(lambda row: get_PSE_pred_IC(row), axis=1)
-df_model["PSE_pred_Bayes"] = df_model.apply(lambda row: get_PSE_pred_Bayes(row), axis=1)
+# df_model["PSE_pred_Bayes"] = df_model.apply(lambda row: get_PSE_pred_Bayes(row), axis=1)
 # df_model["JND_pred_reg"] = df_model.apply(lambda row: get_JND_pred_reg(row), axis=1)
-df_model["JND_pred_IC"] = df_model.apply(lambda row: get_JND_pred_IC(row), axis=1)
-df_model["JND_pred_Bayes"] = df_model.apply(lambda row: get_JND_pred_Bayes(row), axis=1)
-
-df_model["PSE_delta"] = df_model["PSE"] - df_model["standard_angle"]
+# df_model["JND_pred_IC"] = df_model.apply(lambda row: get_JND_pred_IC(row), axis=1)
+# df_model["JND_pred_Bayes"] = df_model.apply(lambda row: get_JND_pred_Bayes(row), axis=1)
+#
+# df_model["PSE_delta"] = df_model["PSE"] - df_model["standard_angle"]
 
 df_model["cue_combination"] = df_model.apply(lambda row: get_cue_combination(row), axis=1)
 
@@ -448,71 +484,71 @@ df_curr = df_model
 # df_curr = df_curr[~(df_curr.standard_angle == 6)]
 df_curr = df_curr[~(df_curr.standard_angle == 20)]
 
-g = sns.FacetGrid(
-    data=df_curr,
-    col="standard_center_frequency",
-    col_order=[500, 800, 1000, 1200],
-    row="cue_combination",
-    row_order=["within", "across", "combined"],
-    hue="trial_type",
-    hue_order=[
-        "ILD-->ILD", "ITD-->ITD",
-        "ITD-->ILD", "ILD-->ITD",
-        "BOTH-->ITD", "BOTH-->ILD",
-        "BOTH-->BOTH"
-    ],
-    palette=sns.color_palette("tab10"),
-    height=2.5
-)
-# g.map(show_reg_vars, "PSE_slope", "PSE_intercept")
-# g.map(show_CIs, "standard_angle", "PSE_ci_95_high", "PSE_ci_95_low")
-g.map(sns.lineplot, "standard_angle", "PSE", marker="o")
-# g.map(sns.regplot, "standard_angle", "PSE_pred_Bayes",  scatter=False, ci=None, line_kws={"ls": "--"})
-g.set_titles(template="{col_name}Hz ({row_name} cue)")
-add_grid_line_of_equality(g)
-g.axes[0,0].set_xlabel('Physical angle')
-g.axes[0,1].set_xlabel('Physical angle')
-g.axes[0,2].set_xlabel('Physical angle')
-g.set_ylabels("PSE")
-g.add_legend()
-g.fig.subplots_adjust(top=0.9)
-g.fig.suptitle('Points of Subjective Equivalence')
-# plt.savefig("PSEs - all cue combinations.png", dpi=200)
+# g = sns.FacetGrid(
+#     data=df_curr,
+#     col="standard_center_frequency",
+#     col_order=[500, 800, 1000, 1200],
+#     row="cue_combination",
+#     row_order=["within", "across", "combined"],
+#     hue="trial_type",
+#     hue_order=[
+#         "ILD-->ILD", "ITD-->ITD",
+#         "ITD-->ILD", "ILD-->ITD",
+#         "BOTH-->ITD", "BOTH-->ILD",
+#         "BOTH-->BOTH"
+#     ],
+#     palette=sns.color_palette("tab10"),
+#     height=2.5
+# )
+# # g.map(show_reg_vars, "PSE_slope", "PSE_intercept")
+# # g.map(show_CIs, "standard_angle", "PSE_ci_95_high", "PSE_ci_95_low")
+# g.map(sns.lineplot, "standard_angle", "PSE", marker="o")
+# # g.map(sns.regplot, "standard_angle", "PSE_pred_Bayes",  scatter=False, ci=None, line_kws={"ls": "--"})
+# g.set_titles(template="{col_name}Hz ({row_name} cue)")
+# add_grid_line_of_equality(g)
+# g.axes[0,0].set_xlabel('Physical angle')
+# g.axes[0,1].set_xlabel('Physical angle')
+# g.axes[0,2].set_xlabel('Physical angle')
+# g.set_ylabels("PSE")
+# g.add_legend()
+# g.fig.subplots_adjust(top=0.9)
+# g.fig.suptitle('Points of Subjective Equivalence')
+# # plt.savefig("PSEs - all cue combinations.png", dpi=200)
 
 
 # JND plot
-g = sns.FacetGrid(
-    data=df_curr,
-    col="standard_center_frequency",
-    col_order=[500, 800, 1200],
-    row="cue_combination",
-    row_order=["within", "across", "combined"],
-    hue="trial_type",
-    hue_order=[
-        "ILD-->ILD", "ITD-->ITD",
-        "ITD-->ILD", "ILD-->ITD",
-        "BOTH-->ITD", "BOTH-->ILD",
-        "BOTH-->BOTH"
-    ],
-    palette=sns.color_palette("tab10"),
-    height=2.5
-)
-# g.map(show_reg_vars, "JND_slope", "JND_intercept")
-# g.map(show_CIs, "standard_angle", "JND_ci_95_high", "JND_ci_95_low")
-# g.map(sns.regplot, "standard_angle", "JND", ci=None)
-g.map(sns.scatterplot, "standard_angle", "JND")
-# g.map(sns.regplot, "standard_angle", "JND_pred_Bayes", scatter=False, ci=None, line_kws={"ls": "--"})
-# g.map(sns.regplot, "standard_angle", "JND_pred_IC", scatter=False, ci=None, line_kws={"ls": "-"})
-g.set_titles(template="{col_name}Hz ")
-g.axes[0,0].set_xlabel('Physical angle')
-g.axes[0,1].set_xlabel('Physical angle')
-g.axes[0,2].set_xlabel('Physical angle')
-g.set_ylabels("JND")
-g.set(ylim=(0, 50))
-g.add_legend()
-g.fig.subplots_adjust(top=0.9)
-g.fig.suptitle('JNDs')
-# plt.savefig("JNDs - all cue combinations.png", dpi=200)
+# g = sns.FacetGrid(
+#     data=df_curr,
+#     col="standard_center_frequency",
+#     col_order=[500, 800, 1200],
+#     row="cue_combination",
+#     row_order=["within", "across", "combined"],
+#     hue="trial_type",
+#     hue_order=[
+#         "ILD-->ILD", "ITD-->ITD",
+#         "ITD-->ILD", "ILD-->ITD",
+#         "BOTH-->ITD", "BOTH-->ILD",
+#         "BOTH-->BOTH"
+#     ],
+#     palette=sns.color_palette("tab10"),
+#     height=2.5
+# )
+# # g.map(show_reg_vars, "JND_slope", "JND_intercept")
+# # g.map(show_CIs, "standard_angle", "JND_ci_95_high", "JND_ci_95_low")
+# # g.map(sns.regplot, "standard_angle", "JND", ci=None)
+# g.map(sns.scatterplot, "standard_angle", "JND")
+# # g.map(sns.regplot, "standard_angle", "JND_pred_Bayes", scatter=False, ci=None, line_kws={"ls": "--"})
+# # g.map(sns.regplot, "standard_angle", "JND_pred_IC", scatter=False, ci=None, line_kws={"ls": "-"})
+# g.set_titles(template="{col_name}Hz ")
+# g.axes[0,0].set_xlabel('Physical angle')
+# g.axes[0,1].set_xlabel('Physical angle')
+# g.axes[0,2].set_xlabel('Physical angle')
+# g.set_ylabels("JND")
+# g.set(ylim=(0, 50))
+# g.add_legend()
+# g.fig.subplots_adjust(top=0.9)
+# g.fig.suptitle('JNDs')
+# # plt.savefig("JNDs - all cue combinations.png", dpi=200)
 
 # PSE vs JND plot
 # g = sns.FacetGrid(
@@ -562,4 +598,24 @@ g.fig.suptitle('JNDs')
 #
 # sns.catplot([JND_ITD_ITD, JND_ILD_ITD, JND_ILD_ILD, JND_ITD_ILD])
 
-# sns.catplot(data=df_model, kind="bar", x="JND", hue="trial_type", hue_order=["ILD-->ILD", "ITD-->ILD", "ITD-->ITD", "ILD-->ITD"], palette=sns.color_palette("Paired"), col="standard_center_frequency")
+sns.catplot(data=df_model, kind="bar", x="JND", hue="trial_type", hue_order=["ILD-->ILD", "ITD-->ILD", "ITD-->ITD", "ILD-->ITD"], palette=sns.color_palette("Paired"), col="standard_center_frequency")
+
+g = sns.FacetGrid(
+    data=df_curr,
+    col="standard_center_frequency",
+    hue="trial_type",
+    hue_order=["ILD-->ILD", "ITD-->ILD", "BOTH-->ILD"]
+)
+g.map(show_CIs, "mixing_gain", "PSE_ci_95_high", "PSE_ci_95_low")
+g.map(sns.lineplot, "mixing_gain", "PSE", marker="o")
+g.add_legend()
+
+g = sns.FacetGrid(
+    data=df_curr,
+    col="standard_center_frequency",
+    row="trial_type",
+    row_order=["ILD-->ILD", "ITD-->ILD", "BOTH-->ILD"]
+)
+g.map(show_CIs, "mixing_gain", "JND_ci_95_high", "JND_ci_95_low")
+g.map(sns.lineplot, "mixing_gain", "JND", marker="o")
+g.add_legend()

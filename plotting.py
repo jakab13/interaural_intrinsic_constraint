@@ -33,12 +33,12 @@ def get_cue_color(cue):
 
 # ITD cue manipulation
 # Initial parameters
-x_T = 10
-x_L = 10
+x_T = 30
+x_L = 2
 sigma_T_0 = 1.5
 sigma_L_0 = 1.
 sigma_T_diff = 0.03
-sigma_L_diff = 0.01
+sigma_L_diff = 0.02
 standard_cue = "L"
 comparison_cue = "T"
 

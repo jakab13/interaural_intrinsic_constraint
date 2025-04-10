@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import statsmodels
 
 path = "/home/kirke/Schreibtisch/ma/python/cue_integration/Results/pilot/pilot_4"
+path = "/Users/jakabpilaszanovich/Documents/GitHub/interaural_intrinsic_constraint/Results/jakab_mixing_gain"
 # Change the directory
 os.chdir(path)
 # Read text File

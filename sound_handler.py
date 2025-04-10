@@ -65,3 +65,13 @@ def apply_cue(stim, cue, angle, filter_frequency, head_radius=8):
         sound.level += ild_vals
     return sound
 
+
+def generate_stim(center_frequency, level=80):
+    low_cutoff = center_frequency / (2 ** (1 / 6))
+    high_cutoff = center_frequency * (2 ** (1 / 6))
+    stim = slab.Binaural.whitenoise(duration=0.3, samplerate=44100)
+    stim = stim.filter(frequency=(low_cutoff, high_cutoff), kind="bp")
+    stim.level = level
+    stim = stim.ramp(duration=0.01)
+    stim = stim.aweight()
+    return stim

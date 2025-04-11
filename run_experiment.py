@@ -1,13 +1,13 @@
 from experiment import Experiment
 from experiment_analysis import *
 
-subject = "jakab_test"
+subject = "jakab_test_2"
 
 exp = Experiment(subject)
 
 exp.standard_center_frequency = 800
 exp.comparison_center_frequency = 800
-exp.head_radius = 8.5  # in cm
+exp.head_radius = 8  # in cm
 reference_angle = 10
 PSE_estimate = 5
 
@@ -58,3 +58,7 @@ exp.PSE_angle = reference_angle
 exp.run_sequence()
 
 plot_pfs(subject)
+
+# Plot with JND values
+plot_pfs(subject, plot_parameter=False, plot_JND=True)
+

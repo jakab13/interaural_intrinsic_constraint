@@ -5,14 +5,14 @@ subject = "jakab_test_2"
 
 exp = Experiment(subject)
 
-exp.standard_center_frequency = 800
-exp.comparison_center_frequency = 800
+exp.standard_center_frequency = 1200
+exp.comparison_center_frequency = 1200
 exp.head_radius = 8  # in cm
 reference_angle = 10
 PSE_estimate = 5
 
 # Familiarisation (without saving data)
-exp.n_reps = 2
+exp.n_reps = 1
 exp.run_sequence(save=False)
 
 # Number of repetitions for one sequence

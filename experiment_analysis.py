@@ -57,8 +57,9 @@ def get_psychometric_estimates(g, save_fig=False):
             print(f"Calculated psignifit estimates for {title}")
             res.save_json(ps_result_file_path)
             if save_fig:
-                ps_figure_file_path = "figures/" + subject + "/" + title
-                Path(ps_figure_file_path).mkdir(parents=True, exist_ok=True)
+                ps_figure_folder_path = "figures/" + subject
+                ps_figure_file_path = ps_figure_folder_path + "/" + title
+                Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
                 plt.figure()
                 psp.plot_psychometric_function(res)
                 plt.savefig(ps_figure_file_path)
@@ -72,8 +73,9 @@ def get_psychometric_estimates(g, save_fig=False):
         print(f"Calculated psignifit estimates for {title}")
         res.save_json(ps_result_file_path)
         if save_fig:
-            ps_figure_file_path = "figures/" + subject + "/" + title
-            Path(ps_figure_file_path).mkdir(parents=True, exist_ok=True)
+            ps_figure_folder_path = "figures/" + subject
+            ps_figure_file_path = ps_figure_folder_path + "/" + title
+            Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
             plt.figure()
             psp.plot_psychometric_function(res)
             plt.savefig(ps_figure_file_path)
@@ -126,6 +128,7 @@ def plot_psychometric_function_local(result,  # noqa: C901, this function is too
                                extrapolate_stimulus: float = 0.2,
                                x_label='Stimulus Level',
                                y_label='Proportion Correct',
+                               JND_offset: float = .0,
                                 **line_kws):
     """ Plot psychometric function fit together with the data.
     """
@@ -178,8 +181,14 @@ def plot_psychometric_function_local(result,  # noqa: C901, this function is too
         ax.plot([CI_95[1]] * 2, y + [-.01, .01], c=line_color)
 
     if plot_JND:
+        PSE = result.threshold(.5, return_ci=False)
         JND = result.threshold(.84, return_ci=False)
-        ax.vlines(x=JND, ymin=0, ymax=0.84, color=line_color, ls=line_style)
+        # ax.vlines(x=JND, ymin=0, ymax=0.84, color=line_color, ls=line_style, lw=line_width)
+        ax.vlines(x=JND, ymin=0, ymax=0.84, color="lightgrey", alpha=.3)
+        ax.vlines(x=PSE, ymin=0, ymax=0.5, color="lightgrey", alpha=.3)
+        rect = matplotlib.patches.Rectangle((PSE, JND_offset + 0.5), JND - PSE, 0.02, color=line_color)
+        ax.add_patch(rect)
+        # ax.hlines(y=JND_offset, xmin=PSE, xmax=JND, color=line_color, lw=6)
 
     # AXIS SETTINGS
     plt.axis('tight')
@@ -190,19 +199,39 @@ def plot_psychometric_function_local(result,  # noqa: C901, this function is too
     return ax
 
 
+def reorderLegend(ax=None, order=None, unique=False):
+    if ax is None: ax=plt.gca()
+    handles, labels = ax.get_legend_handles_labels()
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0])) # sort both labels and handles by labels
+    if order is not None:  # Sort according to a given list (not necessarily complete)
+        keys=dict(zip(order, range(len(order))))
+        labels, handles = zip(*sorted(zip(labels, handles), key=lambda t, keys=keys: keys.get(t[0], np.inf)))
+    if unique: labels, handles = zip(*unique_everseen(zip(labels,handles), key=labels)) # Keep only the first of each handle
+    ax.legend(handles, labels)
+    return(handles, labels)
+
+
+def unique_everseen(seq, key=None):
+    seen = set()
+    seen_add = seen.add
+    return [x for x,k in zip(seq,key) if not (k in seen or seen_add(k))]
+
+
 def plot_pfs(subject, plot_parameter=True, plot_JND=False):
     df = get_model_table(subject)
     folder_path = DIR / "ps_results" / subject
     ps_result_file_paths = [f for f in os.listdir(folder_path) if f.endswith('.json')]
     cmap = matplotlib.cm.get_cmap('tab20')
     line_kws = {
-        "ITD-->ITD": {"color": cmap(2), "ls": "-"},
-        "ILD-->ITD": {"color": cmap(3), "ls": "--"},
-        "ILD-->ILD": {"color": cmap(0), "ls": "-"},
-        "ITD-->ILD": {"color": cmap(1), "ls": "--"}
+        "ITD-->ITD": {"color": cmap(2), "ls": "-", "JND_offset": -0.02},
+        "ILD-->ITD": {"color": cmap(3), "ls": "--", "JND_offset": -.045},
+        "ILD-->ILD": {"color": cmap(0), "ls": "-", "JND_offset": -0.02},
+        "ITD-->ILD": {"color": cmap(1), "ls": "--", "JND_offset": -.045}
     }
     fig, (ax_0, ax_1) = plt.subplots(1, 2, sharey=False, width_ratios=[3, 1], figsize=(16, 6))
+    ax_0.axhline(y=1.0, color="lightgrey", alpha=.3)
     ax_0.axhline(y=0.5, color="lightgrey", alpha=.3)
+    ax_0.axvline(x=0, color="lightgrey", alpha=.3)
     if plot_JND:
         ax_0.axhline(y=0.84, color="lightgrey", alpha=.3)
     for ps_result_file_path in ps_result_file_paths:
@@ -214,22 +243,32 @@ def plot_pfs(subject, plot_parameter=True, plot_JND=False):
                                          ax=ax_0,
                                          plot_parameter=plot_parameter,
                                          plot_JND=plot_JND,
+                                         plot_data=not plot_JND,
                                          data_color=line_kws[trial_type]["color"],
                                          data_size=.5,
                                          extrapolate_stimulus=0,
                                          line_style=line_kws[trial_type]["ls"],
                                          line_color=line_kws[trial_type]["color"],
-                                         label=trial_type)
-
+                                         line_width=3,
+                                         label=trial_type,
+                                         JND_offset=line_kws[trial_type]["JND_offset"],
+                                         x_label="Stimulus displacement [°]",
+                                         y_label="Proportion 'right'")
+    ax_0.set_yticks([0.5, 0.84, 1.])
     ax_0.legend()
+    trial_type_order = ["ILD-->ILD", "ITD-->ILD", "ILD-->ITD", "ITD-->ITD"]
+    reorderLegend(ax_0, trial_type_order)
 
     sns.barplot(df, ax=ax_1, x="trial_type", y="JND", hue="trial_type",
                 hue_order=["ILD-->ILD", "ITD-->ILD", "ITD-->ITD", "ILD-->ITD"],
-                order=["ILD-->ILD", "ITD-->ILD", "ITD-->ITD", "ILD-->ITD"],
+                order=trial_type_order,
                 palette="tab20")
     ax_1.set_ylim(0, df["JND"].max() * 1.05)
+    ax_1.set_xlabel("Cue comparisons", fontsize=14)
+    ax_1.set_ylabel("JND [°]", fontsize=14)
+    ax_1.set_title("Discrimination thresholds", fontsize=14)
+
     freq = df.standard_center_frequency.unique()[0]
     title = f"{subject} at {freq}Hz"
     fig.suptitle(title, fontsize=14)
-
 

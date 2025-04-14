@@ -23,7 +23,7 @@ class Experiment:
         self.standard_cue = "ITD"
         self.comparison_cue = "ILD"
 
-        self.ISI = 0.1
+        self.ISI = 0.2
         self.stim_type = "noise_filtered_third_octave"
         self.columns = get_columns()
 

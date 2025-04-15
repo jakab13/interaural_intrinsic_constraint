@@ -19,7 +19,7 @@ sns.set_style("white")
 DIR = Path(os.getcwd())
 
 # subject = "jakab_matched_single"
-subject = "jakab_matched_ITD_10"
+subject = "jakab_test_2"
 
 folder_path = "/Users/jakabpilaszanovich/Documents/GitHub/interaural_intrinsic_constraint/Results/" + subject
 # Get all CSV files and sort by modification time

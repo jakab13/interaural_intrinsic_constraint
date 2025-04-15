@@ -51,7 +51,7 @@ def get_psychometric_estimates(g, save_fig=False):
         if not np.array_equal(res.data, data.values):
             res = ps.psignifit(
                 data.values,
-                sigmoid="logistic",
+                sigmoid="norm",
                 experiment_type="equal asymptote"
             )
             print(f"Calculated psignifit estimates for {title}")
@@ -101,6 +101,21 @@ def get_model_table(subject):
     combined_df = get_df(subject)
     df_group = combined_df.groupby(["subject", "standard_angle_abs", "standard_center_frequency", "trial_type"])
     df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
+    JND_TT = df_model.loc[df_model.trial_type == "ITD-->ITD", "JND"].values[0]
+    JND_LL = df_model.loc[df_model.trial_type == "ILD-->ILD", "JND"].values[0]
+    sigma_TT = JND_TT / np.sqrt(2)
+    sigma_LL = JND_LL / np.sqrt(2)
+    ref_angle = df_model.loc[df_model.trial_type == "ITD-->ITD", "standard_angle_abs"].values[0]
+    PSE_TL = df_model.loc[df_model.trial_type == "ITD-->ILD", "PSE"].values[0]
+    k_TL = ref_angle / PSE_TL
+    df_model.loc[df_model.trial_type == "ILD-->ITD", "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
+    df_model.loc[df_model.trial_type == "ITD-->ILD", "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
+    # df_model.loc[df_model.trial_type == "ITD-->ITD", "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_TT ** 2)
+    # df_model.loc[df_model.trial_type == "ILD-->ILD", "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_LL ** 2)
+    df_model.loc[df_model.trial_type == "ILD-->ITD", "JND_pred_IC"] = np.sqrt(sigma_TT ** 2 + sigma_TT ** 2)
+    df_model.loc[df_model.trial_type == "ITD-->ILD", "JND_pred_IC"] = np.sqrt(sigma_LL ** 2 + sigma_LL ** 2)
+    # df_model.loc[df_model.trial_type == "ITD-->ITD", "JND_pred_IC"] = np.sqrt(sigma_TT ** 2 + sigma_TT ** 2)
+    # df_model.loc[df_model.trial_type == "ILD-->ILD", "JND_pred_IC"] = np.sqrt(sigma_LL ** 2 + sigma_LL ** 2)
     return df_model
 
 
@@ -257,16 +272,28 @@ def plot_pfs(subject, plot_parameter=True, plot_JND=False):
     ax_0.set_yticks([0.5, 0.84, 1.])
     ax_0.legend()
     trial_type_order = ["ILD-->ILD", "ITD-->ILD", "ILD-->ITD", "ITD-->ITD"]
+    hue_order = ["ILD-->ILD", "ITD-->ILD", "ITD-->ITD", "ILD-->ITD"]
     reorderLegend(ax_0, trial_type_order)
-
-    sns.barplot(df, ax=ax_1, x="trial_type", y="JND", hue="trial_type",
-                hue_order=["ILD-->ILD", "ITD-->ILD", "ITD-->ITD", "ILD-->ITD"],
+    sns.barplot(df, ax=ax_1, x="trial_type", y="JND",
+                hue="trial_type",
+                hue_order=hue_order,
                 order=trial_type_order,
                 palette="tab20")
-    ax_1.set_ylim(0, df["JND"].max() * 1.05)
+    for bar, curr_trial_type in zip(ax_1.patches, hue_order):
+        x = bar.get_x()
+        width = bar.get_width()
+        JND_pred_no_prior = df.loc[df.trial_type == curr_trial_type, "JND_pred_no_prior"].values[0]
+        JND_pred_IC = df.loc[df.trial_type == curr_trial_type, "JND_pred_IC"].values[0]
+        ax_1.hlines(y=JND_pred_no_prior, xmin=x - 0.1, xmax=x + 0.1 + width, ls="--", color='tab:red', linewidth=2)
+        ax_1.hlines(y=JND_pred_IC, xmin=x - 0.1, xmax=x + 0.1 + width, ls="--", color='tab:green', linewidth=2)
+
+    ax_1.set_ylim(0, df["JND"].max() * 1.2)
     ax_1.set_xlabel("Cue comparisons", fontsize=14)
     ax_1.set_ylabel("JND [°]", fontsize=14)
     ax_1.set_title("Discrimination thresholds", fontsize=14)
+    line_1 = matplotlib.lines.Line2D([], [], color="tab:red", ls="--", label="SDT prediction")
+    line_2 = matplotlib.lines.Line2D([], [], color="tab:green", ls="--", label="IC prediction")
+    ax_1.legend(handles=[line_1, line_2], loc="upper left")
 
     freq = df.standard_center_frequency.unique()[0]
     title = f"{subject} at {freq}Hz"

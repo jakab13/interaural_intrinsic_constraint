@@ -46,7 +46,10 @@ class Experiment:
             trial_type = standard_cue + "-->" + comparison_cue
 
             standard_stim = generate_stim(self.standard_center_frequency)
-            comparison_stim = copy.deepcopy(standard_stim)
+            if self.standard_center_frequency == self.comparison_center_frequency:
+                comparison_stim = copy.deepcopy(standard_stim)
+            else:
+                comparison_stim = generate_stim(self.comparison_center_frequency)
 
             standard_stim = apply_cue(standard_stim, standard_cue, standard_angle, self.standard_center_frequency, head_radius=self.head_radius)
             comparison_stim = apply_cue(comparison_stim, comparison_cue, comparison_angle, self.comparison_center_frequency, head_radius=self.head_radius)

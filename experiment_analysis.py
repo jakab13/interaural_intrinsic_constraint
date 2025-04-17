@@ -39,9 +39,9 @@ def get_psychometric_estimates(g, save_fig=False):
     comparison_center_frequency = g["comparison_center_frequency"].unique()[0]
     trial_type = g["trial_type"].unique()[0]
     title = f"{subject}_{standard_center_frequency}-->{comparison_center_frequency}_{trial_type}_{int(standard_angle)}"
-    ps_result_folder_path = DIR / Path("ps_results") / Path(subject)
+    ps_result_folder_path = DIR / Path("ps_results") / Path(subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
     Path(ps_result_folder_path).mkdir(parents=True, exist_ok=True)
-    ps_result_file_path = ps_result_folder_path / Path(title + ".json")
+    ps_result_file_path = ps_result_folder_path / Path(title + "°" + ".json")
     data = g.groupby("comparison_angle_abs", as_index=False).agg(
         {"score_abs": "sum", g.columns[0]: "count"}).rename(
         columns={g.columns[0]: 'n_total'})
@@ -57,8 +57,8 @@ def get_psychometric_estimates(g, save_fig=False):
             print(f"Calculated psignifit estimates for {title}")
             res.save_json(ps_result_file_path)
             if save_fig:
-                ps_figure_folder_path = "figures/" + subject
-                ps_figure_file_path = ps_figure_folder_path + "/" + title
+                ps_figure_folder_path = DIR / Path("figures") / Path(subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
+                ps_figure_file_path = ps_figure_folder_path / Path(title + "°")
                 Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
                 plt.figure()
                 psp.plot_psychometric_function(res)
@@ -73,8 +73,9 @@ def get_psychometric_estimates(g, save_fig=False):
         print(f"Calculated psignifit estimates for {title}")
         res.save_json(ps_result_file_path)
         if save_fig:
-            ps_figure_folder_path = "figures/" + subject
-            ps_figure_file_path = ps_figure_folder_path + "/" + title
+            ps_figure_folder_path = DIR / Path("figures") / Path(
+                subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
+            ps_figure_file_path = ps_figure_folder_path / Path(title + "°")
             Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
             plt.figure()
             psp.plot_psychometric_function(res)
@@ -99,23 +100,9 @@ def get_psychometric_estimates(g, save_fig=False):
 
 def get_model_table(subject):
     combined_df = get_df(subject)
-    df_group = combined_df.groupby(["subject", "standard_angle_abs", "standard_center_frequency", "trial_type"])
+    df_group = combined_df.groupby(
+        ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
     df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
-    JND_TT = df_model.loc[df_model.trial_type == "ITD-->ITD", "JND"].values[0]
-    JND_LL = df_model.loc[df_model.trial_type == "ILD-->ILD", "JND"].values[0]
-    sigma_TT = JND_TT / np.sqrt(2)
-    sigma_LL = JND_LL / np.sqrt(2)
-    ref_angle = df_model.loc[df_model.trial_type == "ITD-->ITD", "standard_angle_abs"].values[0]
-    PSE_TL = df_model.loc[df_model.trial_type == "ITD-->ILD", "PSE"].values[0]
-    k_TL = ref_angle / PSE_TL
-    df_model.loc[df_model.trial_type == "ILD-->ITD", "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
-    df_model.loc[df_model.trial_type == "ITD-->ILD", "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
-    # df_model.loc[df_model.trial_type == "ITD-->ITD", "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_TT ** 2)
-    # df_model.loc[df_model.trial_type == "ILD-->ILD", "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_LL ** 2)
-    df_model.loc[df_model.trial_type == "ILD-->ITD", "JND_pred_IC"] = np.sqrt(sigma_TT ** 2 + sigma_TT ** 2)
-    df_model.loc[df_model.trial_type == "ITD-->ILD", "JND_pred_IC"] = np.sqrt(sigma_LL ** 2 + sigma_LL ** 2)
-    # df_model.loc[df_model.trial_type == "ITD-->ITD", "JND_pred_IC"] = np.sqrt(sigma_TT ** 2 + sigma_TT ** 2)
-    # df_model.loc[df_model.trial_type == "ILD-->ILD", "JND_pred_IC"] = np.sqrt(sigma_LL ** 2 + sigma_LL ** 2)
     return df_model
 
 
@@ -221,27 +208,41 @@ def reorderLegend(ax=None, order=None, unique=False):
     if order is not None:  # Sort according to a given list (not necessarily complete)
         keys=dict(zip(order, range(len(order))))
         labels, handles = zip(*sorted(zip(labels, handles), key=lambda t, keys=keys: keys.get(t[0], np.inf)))
-    if unique: labels, handles = zip(*unique_everseen(zip(labels,handles), key=labels)) # Keep only the first of each handle
+    if unique:
+        labels, handles = zip(*unique_everseen(zip(labels, handles), key=labels))  # Keep only the first of each handle
     ax.legend(handles, labels)
-    return(handles, labels)
+    return handles, labels
 
 
 def unique_everseen(seq, key=None):
     seen = set()
     seen_add = seen.add
-    return [x for x,k in zip(seq,key) if not (k in seen or seen_add(k))]
+    return [x for x, k in zip(seq, key) if not (k in seen or seen_add(k))]
 
 
-def plot_pfs(subject, plot_parameter=True, plot_JND=False):
+def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, plot_parameter=True, plot_JND=False):
     df = get_model_table(subject)
-    folder_path = DIR / "ps_results" / subject
+    df = df[(df.standard_center_frequency == standard_center_frequency)
+            & (df.comparison_center_frequency == comparison_center_frequency)]
+    if len(df) > 3:
+        JND_TT = df.loc[df.trial_type == "ITD-->ITD", "JND"].values[0]
+        JND_LL = df.loc[df.trial_type == "ILD-->ILD", "JND"].values[0]
+        sigma_TT = JND_TT / np.sqrt(2)
+        sigma_LL = JND_LL / np.sqrt(2)
+        # JND predictions without a prior
+        df.loc[df.trial_type == "ILD-->ITD", "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
+        df.loc[df.trial_type == "ITD-->ILD", "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
+        # JND predictions with IC model
+        df.loc[df.trial_type == "ILD-->ITD", "JND_pred_IC"] = JND_TT
+        df.loc[df.trial_type == "ITD-->ILD", "JND_pred_IC"] = JND_LL
+    folder_path = DIR / "ps_results" / subject / f"{standard_center_frequency}-->{comparison_center_frequency}"
     ps_result_file_paths = [f for f in os.listdir(folder_path) if f.endswith('.json')]
     cmap = matplotlib.cm.get_cmap('tab20')
     line_kws = {
-        "ITD-->ITD": {"color": cmap(2), "ls": "-", "JND_offset": -0.02},
-        "ILD-->ITD": {"color": cmap(3), "ls": "--", "JND_offset": -.045},
+        "ITD-->ITD": {"color": cmap(2), "ls": "-", "JND_offset": -0.06},
+        "ILD-->ITD": {"color": cmap(3), "ls": "--", "JND_offset": -0.08},
         "ILD-->ILD": {"color": cmap(0), "ls": "-", "JND_offset": -0.02},
-        "ITD-->ILD": {"color": cmap(1), "ls": "--", "JND_offset": -.045}
+        "ITD-->ILD": {"color": cmap(1), "ls": "--", "JND_offset": -0.04}
     }
     fig, (ax_0, ax_1) = plt.subplots(1, 2, sharey=False, width_ratios=[3, 1], figsize=(16, 6))
     ax_0.axhline(y=1.0, color="lightgrey", alpha=.3)
@@ -279,13 +280,14 @@ def plot_pfs(subject, plot_parameter=True, plot_JND=False):
                 hue_order=hue_order,
                 order=trial_type_order,
                 palette="tab20")
-    for bar, curr_trial_type in zip(ax_1.patches, hue_order):
-        x = bar.get_x()
-        width = bar.get_width()
-        JND_pred_no_prior = df.loc[df.trial_type == curr_trial_type, "JND_pred_no_prior"].values[0]
-        JND_pred_IC = df.loc[df.trial_type == curr_trial_type, "JND_pred_IC"].values[0]
-        ax_1.hlines(y=JND_pred_no_prior, xmin=x - 0.1, xmax=x + 0.1 + width, ls="--", color='tab:red', linewidth=2)
-        ax_1.hlines(y=JND_pred_IC, xmin=x - 0.1, xmax=x + 0.1 + width, ls="--", color='tab:green', linewidth=2)
+    if len(df) > 3:
+        for bar, curr_trial_type in zip(ax_1.patches, hue_order):
+            x = bar.get_x()
+            width = bar.get_width()
+            JND_pred_no_prior = df.loc[df.trial_type == curr_trial_type, "JND_pred_no_prior"].values[0]
+            JND_pred_IC = df.loc[df.trial_type == curr_trial_type, "JND_pred_IC"].values[0]
+            ax_1.hlines(y=JND_pred_no_prior, xmin=x, xmax=x + width, ls="--", color='tab:red', linewidth=2)
+            ax_1.hlines(y=JND_pred_IC, xmin=x, xmax=x + width, ls="--", color='tab:green', linewidth=2)
 
     ax_1.set_ylim(0, df["JND"].max() * 1.2)
     ax_1.set_xlabel("Cue comparisons", fontsize=14)
@@ -295,7 +297,6 @@ def plot_pfs(subject, plot_parameter=True, plot_JND=False):
     line_2 = matplotlib.lines.Line2D([], [], color="tab:green", ls="--", label="IC prediction")
     ax_1.legend(handles=[line_1, line_2], loc="upper left")
 
-    freq = df.standard_center_frequency.unique()[0]
-    title = f"{subject} at {freq}Hz"
+    title = f"{subject} at {standard_center_frequency}-->{comparison_center_frequency}Hz"
     fig.suptitle(title, fontsize=14)
 

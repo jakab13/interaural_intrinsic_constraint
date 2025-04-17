@@ -5,11 +5,11 @@ subject = "jakab_test_2"
 
 exp = Experiment(subject)
 
-exp.standard_center_frequency = 1200
-exp.comparison_center_frequency = 1200
-exp.head_radius = 8  # in cm
+exp.standard_center_frequency = 800
+exp.comparison_center_frequency = 800
+exp.head_radius = 7.8  # in cm
 reference_angle = 10
-PSE_estimate = 5
+PSE_estimate = 5  # initial guess of PSE
 
 # Familiarisation (without saving data)
 exp.n_reps = 1
@@ -26,7 +26,7 @@ exp.PSE_angle = reference_angle
 exp.run_sequence()
 
 # Plot psychometric functions
-plot_pfs(subject)
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency)
 
 # ITD-->ILD =====================================
 exp.standard_cue = "ITD"
@@ -36,7 +36,7 @@ exp.PSE_angle = PSE_estimate
 exp.run_sequence()
 
 # Plot psychometric functions
-plot_pfs(subject)
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency)
 
 # Get PSE from above measurement
 PSE_estimate = get_PSE(subject, "ITD", "ILD", exp.standard_angle, exp.standard_center_frequency)
@@ -48,7 +48,7 @@ exp.standard_angle = PSE_estimate
 exp.PSE_angle = PSE_estimate
 exp.run_sequence()
 
-plot_pfs(subject)
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency)
 
 # ILD-->ITD =====================================
 exp.standard_cue = "ILD"
@@ -57,8 +57,8 @@ exp.standard_angle = PSE_estimate
 exp.PSE_angle = reference_angle
 exp.run_sequence()
 
-plot_pfs(subject)
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency)
 
 # Plot with JND values
-plot_pfs(subject, plot_parameter=False, plot_JND=True)
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, plot_parameter=False, plot_JND=True)
 

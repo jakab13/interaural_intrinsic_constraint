@@ -14,6 +14,14 @@ sns.set_style("white")
 DIR = Path(os.getcwd())
 
 
+def ask_to_continue(prompt="Do you want to continue? (y): ", expected="y"):
+    while True:
+        response = input(prompt).strip().lower()
+        if response == expected:
+            break
+        print(f"Please type '{expected}' to continue.")
+
+
 def get_df(subject):
     folder_path = DIR / "Results" / subject
     csv_files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
@@ -53,6 +61,9 @@ def get_psychometric_estimates(g, save_fig=False):
                 data.values,
                 sigmoid="norm",
                 experiment_type="equal asymptote"
+                # cuts=[0.5, 0.84]
+                # bootstrapMethod="parametric",
+                # nBootstrapSamples=1000
             )
             print(f"Calculated psignifit estimates for {title}")
             res.save_json(ps_result_file_path)
@@ -86,13 +97,23 @@ def get_psychometric_estimates(g, save_fig=False):
     PSE_ci_95_low = res.confidence_intervals['threshold']["0.95"][0]
     PSE_ci_95_high = res.confidence_intervals['threshold']["0.95"][1]
 
-    JND = res.threshold(0.84, return_ci=False) - PSE
+    JND = res.threshold(0.84, return_ci=False, unscaled=False) - PSE
+
+    width = res.parameters_estimate_mean["width"] / 2
+    width_ci_95_low = res.confidence_intervals['width']["0.95"][0] / 2
+    width_ci_95_high = res.confidence_intervals['width']["0.95"][1] / 2
+
+    JND_ci_95_low = (width_ci_95_low / width) * JND
+    JND_ci_95_high = (width_ci_95_high / width) * JND
+
     slope = res.slope_at_proportion_correct(0.5)
     row = {
         "PSE": PSE,
         "PSE_ci_95_low": PSE_ci_95_low,
         "PSE_ci_95_high": PSE_ci_95_high,
         "JND": JND,
+        "JND_ci_95_low": JND_ci_95_low,
+        "JND_ci_95_high": JND_ci_95_high,
         "slope": slope
     }
     return pd.Series(row)
@@ -114,6 +135,7 @@ def get_PSE(subject, standard_cue, comparison_cue, standard_angle_abs, standard_
                    & (df_model.trial_type == trial_type)
                    & (df_model.standard_center_frequency == standard_center_frequency)]
     PSE = PSE_row["PSE"].values[0]
+    PSE = round(PSE, 2)
     return PSE
 
 
@@ -285,11 +307,18 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, pl
             x = bar.get_x()
             width = bar.get_width()
             JND_pred_no_prior = df.loc[df.trial_type == curr_trial_type, "JND_pred_no_prior"].values[0]
+            JND_ci_95_low = df.loc[df.trial_type == curr_trial_type, "JND_ci_95_low"].values[0]
+            JND_ci_95_high = df.loc[df.trial_type == curr_trial_type, "JND_ci_95_high"].values[0]
             JND_pred_IC = df.loc[df.trial_type == curr_trial_type, "JND_pred_IC"].values[0]
+
             ax_1.hlines(y=JND_pred_no_prior, xmin=x, xmax=x + width, ls="--", color='tab:red', linewidth=2)
             ax_1.hlines(y=JND_pred_IC, xmin=x, xmax=x + width, ls="--", color='tab:green', linewidth=2)
+            # Plot errorbars
+            ax_1.vlines(x=x + width/2, ymin=JND_ci_95_low, ymax=JND_ci_95_high, color="black")
+            ax_1.hlines(y=JND_ci_95_high, xmin=x + width/2 - 0.05, xmax=x + width/2 + 0.05, color="black")
+            ax_1.hlines(y=JND_ci_95_low, xmin=x + width / 2 - 0.05, xmax=x + width / 2 + 0.05, color="black")
 
-    ax_1.set_ylim(0, df["JND"].max() * 1.2)
+    ax_1.set_ylim(0, df["JND_ci_95_high"].max() * 1.1)
     ax_1.set_xlabel("Cue comparisons", fontsize=14)
     ax_1.set_ylabel("JND [°]", fontsize=14)
     ax_1.set_title("Discrimination thresholds", fontsize=14)

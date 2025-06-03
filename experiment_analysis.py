@@ -22,8 +22,8 @@ def ask_to_continue(prompt="Do you want to continue? (y): ", expected="y"):
         print(f"Please type '{expected}' to continue.")
 
 
-def get_df(subject):
-    folder_path = DIR / "Results" / subject
+def get_df(subject, standard_center_frequency=None, comparison_center_frequency=None, exp_folder="local"):
+    folder_path = DIR / "Results" / exp_folder / subject
     csv_files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
     csv_files = sorted(
         csv_files,
@@ -37,19 +37,46 @@ def get_df(subject):
         dataframes.append(df)
     combined_df = pd.concat(dataframes, ignore_index=True)
     combined_df = combined_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    if standard_center_frequency is not None or comparison_center_frequency is not None:
+        combined_df = combined_df[(combined_df.standard_center_frequency == standard_center_frequency)
+                & (combined_df.comparison_center_frequency == comparison_center_frequency)]
+    combined_df["is_control"] = False
+    # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2.67) & (combined_df.trial_type == "BOTH-->BOTH"))]
+    # combined_df = combined_df[~((combined_df.comparison_angle_abs == -5) & (combined_df.trial_type == "ILD-->ILD"))]
+    # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2) & (combined_df.trial_type == "ITD-->ITD"))]
+    standard_angles = sorted(combined_df.standard_angle_abs.unique())
+    reference_angle = [s for s in standard_angles if s % 1 == 0][-1]
+    PSE_angle = [s for s in standard_angles if s != reference_angle][0]
+    combined_df.loc[(combined_df.standard_angle_abs == reference_angle) & (
+            combined_df.trial_type == "ILD-->ILD"), "is_control"] = True
+    combined_df.loc[(combined_df.standard_angle_abs == PSE_angle) & (
+                combined_df.trial_type == "ITD-->ITD"), "is_control"] = True
     return combined_df
+
+
+def get_df_all(exp_folder="single_cue_exp"):
+    folder_path = DIR / "Results" / exp_folder
+    subjects = [f for f in os.listdir(folder_path) if not f.startswith('.')]
+    dfs = []
+    for subject in subjects:
+        df_sub = get_df(subject, exp_folder=exp_folder)
+        dfs.append(df_sub)
+    df_all = pd.concat(dfs, ignore_index=True)
+    return df_all
 
 
 def get_psychometric_estimates(g, save_fig=False):
     subject = g["subject"].unique()[0]
     standard_angle = g["standard_angle_abs"].unique()[0]
+    # standard_angle = round(standard_angle, 2)
     standard_center_frequency = g["standard_center_frequency"].unique()[0]
     comparison_center_frequency = g["comparison_center_frequency"].unique()[0]
     trial_type = g["trial_type"].unique()[0]
-    title = f"{subject}_{standard_center_frequency}-->{comparison_center_frequency}_{trial_type}_{int(standard_angle)}"
+    is_control = g["is_control"].unique()[0]
+    title = f"{subject}_{standard_center_frequency}-->{comparison_center_frequency}_{trial_type}_{int(standard_angle//1)}°{int(standard_angle % 1 * 100)}'"
     ps_result_folder_path = DIR / Path("ps_results") / Path(subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
     Path(ps_result_folder_path).mkdir(parents=True, exist_ok=True)
-    ps_result_file_path = ps_result_folder_path / Path(title + "°" + ".json")
+    ps_result_file_path = ps_result_folder_path / Path(title + ".json")
     data = g.groupby("comparison_angle_abs", as_index=False).agg(
         {"score_abs": "sum", g.columns[0]: "count"}).rename(
         columns={g.columns[0]: 'n_total'})
@@ -61,15 +88,12 @@ def get_psychometric_estimates(g, save_fig=False):
                 data.values,
                 sigmoid="norm",
                 experiment_type="equal asymptote"
-                # cuts=[0.5, 0.84]
-                # bootstrapMethod="parametric",
-                # nBootstrapSamples=1000
             )
             print(f"Calculated psignifit estimates for {title}")
             res.save_json(ps_result_file_path)
             if save_fig:
                 ps_figure_folder_path = DIR / Path("figures") / Path(subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
-                ps_figure_file_path = ps_figure_folder_path / Path(title + "°")
+                ps_figure_file_path = ps_figure_folder_path / Path(title)
                 Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
                 plt.figure()
                 psp.plot_psychometric_function(res)
@@ -86,7 +110,7 @@ def get_psychometric_estimates(g, save_fig=False):
         if save_fig:
             ps_figure_folder_path = DIR / Path("figures") / Path(
                 subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
-            ps_figure_file_path = ps_figure_folder_path / Path(title + "°")
+            ps_figure_file_path = ps_figure_folder_path / Path(title)
             Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
             plt.figure()
             psp.plot_psychometric_function(res)
@@ -106,7 +130,12 @@ def get_psychometric_estimates(g, save_fig=False):
     JND_ci_95_low = (width_ci_95_low / width) * JND
     JND_ci_95_high = (width_ci_95_high / width) * JND
 
+    eta = res.parameters_estimate_mean["eta"]
+    eta_ci_95_low = res.confidence_intervals['eta']["0.95"][0]
+    eta_ci_95_high = res.confidence_intervals['eta']["0.95"][1]
+
     slope = res.slope_at_proportion_correct(0.5)
+
     row = {
         "PSE": PSE,
         "PSE_ci_95_low": PSE_ci_95_low,
@@ -114,13 +143,17 @@ def get_psychometric_estimates(g, save_fig=False):
         "JND": JND,
         "JND_ci_95_low": JND_ci_95_low,
         "JND_ci_95_high": JND_ci_95_high,
-        "slope": slope
+        "eta": eta,
+        "eta_ci_95_low": eta_ci_95_low,
+        "eta_ci_95_high": eta_ci_95_high,
+        "slope": slope,
+        "is_control": is_control
     }
     return pd.Series(row)
 
 
-def get_model_table(subject):
-    combined_df = get_df(subject)
+def get_model_table(subject, standard_center_frequency, comparison_center_frequency):
+    combined_df = get_df(subject, standard_center_frequency, comparison_center_frequency, exp_folder="single_cue_exp")
     df_group = combined_df.groupby(
         ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
     df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
@@ -129,7 +162,7 @@ def get_model_table(subject):
 
 def get_PSE(subject, standard_cue, comparison_cue, standard_angle_abs, standard_center_frequency):
     trial_type = standard_cue + "-->" + comparison_cue
-    df_model = get_model_table(subject)
+    df_model = get_model_table(subject, standard_center_frequency, standard_center_frequency)
     PSE_row = df_model[(df_model.subject == subject)
                    & (df_model.standard_angle_abs == standard_angle_abs)
                    & (df_model.trial_type == trial_type)
@@ -242,29 +275,37 @@ def unique_everseen(seq, key=None):
     return [x for x, k in zip(seq, key) if not (k in seen or seen_add(k))]
 
 
-def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, plot_parameter=True, plot_JND=False):
-    df = get_model_table(subject)
-    df = df[(df.standard_center_frequency == standard_center_frequency)
-            & (df.comparison_center_frequency == comparison_center_frequency)]
+def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, weak_cue="ITD", strong_cue="ILD", plot_parameter=True, plot_JND=False):
+    df = get_model_table(subject, standard_center_frequency, comparison_center_frequency)
+    df = df[~(df.is_control)]
+    trial_type_weak = f"{weak_cue}-->{weak_cue}"
+    trial_type_strong = f"{strong_cue}-->{strong_cue}"
+    trial_type_weak_to_strong = f"{weak_cue}-->{strong_cue}"
+    trial_type_strong_to_weak = f"{strong_cue}-->{weak_cue}"
     if len(df) > 3:
-        JND_TT = df.loc[df.trial_type == "ITD-->ITD", "JND"].values[0]
-        JND_LL = df.loc[df.trial_type == "ILD-->ILD", "JND"].values[0]
+        JND_TT = df.loc[df.trial_type == trial_type_weak, "JND"].values[0]
+        JND_LL = df.loc[df.trial_type == trial_type_strong, "JND"].values[0]
         sigma_TT = JND_TT / np.sqrt(2)
         sigma_LL = JND_LL / np.sqrt(2)
         # JND predictions without a prior
-        df.loc[df.trial_type == "ILD-->ITD", "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
-        df.loc[df.trial_type == "ITD-->ILD", "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
+        df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
+        df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
         # JND predictions with IC model
-        df.loc[df.trial_type == "ILD-->ITD", "JND_pred_IC"] = JND_TT
-        df.loc[df.trial_type == "ITD-->ILD", "JND_pred_IC"] = JND_LL
+        df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_IC"] = JND_TT
+        df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_IC"] = JND_LL
     folder_path = DIR / "ps_results" / subject / f"{standard_center_frequency}-->{comparison_center_frequency}"
-    ps_result_file_paths = [f for f in os.listdir(folder_path) if f.endswith('.json')]
+    # ps_result_file_paths = [f for f in os.listdir(folder_path) if f.endswith('.json')]
     cmap = matplotlib.cm.get_cmap('tab20')
     line_kws = {
         "ITD-->ITD": {"color": cmap(2), "ls": "-", "JND_offset": -0.06},
         "ILD-->ITD": {"color": cmap(3), "ls": "--", "JND_offset": -0.08},
+        "BOTH-->ITD": {"color": cmap(3), "ls": "--", "JND_offset": -0.08},
         "ILD-->ILD": {"color": cmap(0), "ls": "-", "JND_offset": -0.02},
-        "ITD-->ILD": {"color": cmap(1), "ls": "--", "JND_offset": -0.04}
+        "ITD-->ILD": {"color": cmap(1), "ls": "--", "JND_offset": -0.04},
+        "BOTH-->ILD": {"color": cmap(1), "ls": "--", "JND_offset": -0.04},
+        "BOTH-->BOTH": {"color": cmap(4), "ls": "-", "JND_offset": -0.02},
+        "ITD-->BOTH": {"color": cmap(5), "ls": "--", "JND_offset": -0.04},
+        "ILD-->BOTH": {"color": cmap(5), "ls": "--", "JND_offset": -0.04}
     }
     fig, (ax_0, ax_1) = plt.subplots(1, 2, sharey=False, width_ratios=[3, 1], figsize=(16, 6))
     ax_0.axhline(y=1.0, color="lightgrey", alpha=.3)
@@ -272,11 +313,13 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, pl
     ax_0.axvline(x=0, color="lightgrey", alpha=.3)
     if plot_JND:
         ax_0.axhline(y=0.84, color="lightgrey", alpha=.3)
-    for ps_result_file_path in ps_result_file_paths:
+    for index, row in df.iterrows():
+        trial_type = row.trial_type
+        title = f"{subject}_{standard_center_frequency}-->{comparison_center_frequency}_{trial_type}_{int(row.standard_angle_abs // 1)}°{int(row.standard_angle_abs % 1 * 100)}'"
+        ps_result_file_path = folder_path / Path(title + ".json")
         res = ps.Result.load_json(folder_path / ps_result_file_path)
-        standard_cue = ps_result_file_path.split("-->")[1][-3:]
-        comparison_cue = ps_result_file_path.split("-->")[2][:3]
-        trial_type = standard_cue + "-->" + comparison_cue
+        # standard_cue = ps_result_file_path.split("-->")[1].split("_")[1]
+        # comparison_cue = ps_result_file_path.split("-->")[2].split("_")[0]
         plot_psychometric_function_local(res,
                                          ax=ax_0,
                                          plot_parameter=plot_parameter,
@@ -294,14 +337,15 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, pl
                                          y_label="Proportion 'right'")
     ax_0.set_yticks([0.5, 0.84, 1.])
     ax_0.legend()
-    trial_type_order = ["ILD-->ILD", "ITD-->ILD", "ILD-->ITD", "ITD-->ITD"]
-    hue_order = ["ILD-->ILD", "ITD-->ILD", "ITD-->ITD", "ILD-->ITD"]
+    trial_type_order = [trial_type_strong, trial_type_weak_to_strong, trial_type_strong_to_weak, trial_type_weak]
+    hue_order = [trial_type_strong, trial_type_weak_to_strong, trial_type_weak, trial_type_strong_to_weak]
     reorderLegend(ax_0, trial_type_order)
+    palette = [line_kws[trial_type]["color"] for trial_type in hue_order]
     sns.barplot(df, ax=ax_1, x="trial_type", y="JND",
                 hue="trial_type",
                 hue_order=hue_order,
                 order=trial_type_order,
-                palette="tab20")
+                palette=palette)
     if len(df) > 3:
         for bar, curr_trial_type in zip(ax_1.patches, hue_order):
             x = bar.get_x()

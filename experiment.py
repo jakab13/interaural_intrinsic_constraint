@@ -37,7 +37,7 @@ class Experiment:
         )
         trial_seq = trial_seq.sample(frac=1).reset_index(drop=True)
         if save:
-            results_table = slab.ResultsTable(columns=self.columns, subject=self.subject)
+            results_table = slab.ResultsTable(columns=self.columns, subject=self.subject, folder="/Results/local")
         for seq_idx, seq_row in trial_seq.iterrows():
             standard_angle = seq_row["standard_angle"]
             comparison_angle = seq_row["comparison_angle"]

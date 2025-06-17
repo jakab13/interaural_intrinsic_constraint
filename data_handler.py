@@ -37,6 +37,7 @@ def get_columns():
         "datetime_onset",
         "stim_type",
         "trial_type",
+        "mixing_gain",
         "trial_index",
         "standard_angle",
         "standard_value",

@@ -41,17 +41,24 @@ def get_df(subject, standard_center_frequency=None, comparison_center_frequency=
         combined_df = combined_df[(combined_df.standard_center_frequency == standard_center_frequency)
                 & (combined_df.comparison_center_frequency == comparison_center_frequency)]
     combined_df["is_control"] = False
+    freqs = combined_df["standard_center_frequency"].unique()
     # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2.67) & (combined_df.trial_type == "BOTH-->BOTH"))]
     # combined_df = combined_df[~((combined_df.comparison_angle_abs == -5) & (combined_df.trial_type == "ILD-->ILD"))]
     # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2) & (combined_df.trial_type == "ITD-->ITD"))]
-    standard_angles = sorted(combined_df.standard_angle_abs.unique())
-    reference_angle = [s for s in standard_angles if s % 1 == 0][-1]
-    PSE_angle = [s for s in standard_angles if s != reference_angle][0]
-    combined_df.loc[(combined_df.standard_angle_abs == reference_angle) & (
-            combined_df.trial_type == "ILD-->ILD"), "is_control"] = True
-    combined_df.loc[(combined_df.standard_angle_abs == PSE_angle) & (
-                combined_df.trial_type == "ITD-->ITD"), "is_control"] = True
-    return combined_df
+    filtered_dataframes = []
+    for freq in freqs:
+        df_curr = combined_df[combined_df["standard_center_frequency"] == freq]
+        standard_angles = sorted(df_curr.standard_angle_abs.unique())
+        if len(standard_angles) > 1:
+            reference_angle = [s for s in standard_angles if s % 1 == 0][-1]
+            PSE_angle = [s for s in standard_angles if s != reference_angle][0]
+            df_curr.loc[(df_curr.standard_angle_abs == reference_angle) & (
+                    df_curr.trial_type == "ILD-->ILD"), "is_control"] = True
+            df_curr.loc[(df_curr.standard_angle_abs == PSE_angle) & (
+                        df_curr.trial_type == "ITD-->ITD"), "is_control"] = True
+        filtered_dataframes.append(df_curr)
+    df_final = pd.concat(filtered_dataframes, ignore_index=True)
+    return df_final
 
 
 def get_df_all(exp_folder="single_cue_exp"):
@@ -159,6 +166,13 @@ def get_model_table(subject, standard_center_frequency, comparison_center_freque
     df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
     return df_model
 
+
+def get_model_table_all():
+    df_all = get_df_all()
+    df_group = df_all.groupby(
+        ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
+    df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
+    return df_model
 
 def get_PSE(subject, standard_cue, comparison_cue, standard_angle_abs, standard_center_frequency):
     trial_type = standard_cue + "-->" + comparison_cue
@@ -275,7 +289,8 @@ def unique_everseen(seq, key=None):
     return [x for x, k in zip(seq, key) if not (k in seen or seen_add(k))]
 
 
-def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, weak_cue="ITD", strong_cue="ILD", plot_parameter=True, plot_JND=False):
+def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, weak_cue="ITD", strong_cue="ILD",
+             plot_parameter=True, plot_JND=False, save_fig=False):
     df = get_model_table(subject, standard_center_frequency, comparison_center_frequency)
     df = df[~(df.is_control)]
     trial_type_weak = f"{weak_cue}-->{weak_cue}"
@@ -372,4 +387,10 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
 
     title = f"{subject} at {standard_center_frequency}-->{comparison_center_frequency}Hz"
     fig.suptitle(title, fontsize=14)
+    if save_fig:
+        ps_figure_folder_path = DIR / Path("figures") / Path("single_cue_exp")
+        ps_figure_file_path = ps_figure_folder_path / Path(title)
+        Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
+        plt.savefig(ps_figure_file_path, dpi=200)
+        plt.close()
 

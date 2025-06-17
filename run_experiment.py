@@ -1,12 +1,14 @@
 from experiment import Experiment
 from experiment_analysis import *
 
-subject = "jakab_test_ild_both"
+subject = "test_mixing_gain"
 
 exp = Experiment(subject)
 
-exp.standard_center_frequency = 200
-exp.comparison_center_frequency = 200
+exp.mixing_gain = 1
+
+exp.standard_center_frequency = 1000
+exp.comparison_center_frequency = 1000
 exp.head_radius = 8.0  # in cm
 reference_angle = 10
 PSE_estimate = 4  # initial guess of PSE

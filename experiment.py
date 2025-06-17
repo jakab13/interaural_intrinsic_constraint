@@ -27,6 +27,8 @@ class Experiment:
         self.stim_type = "noise_filtered_third_octave"
         self.columns = get_columns()
 
+        self.mixing_gain = 0.5
+
     def run_sequence(self, save=True):
         trial_seq = generate_trial_sequence(
             self.standard_angle,
@@ -37,7 +39,7 @@ class Experiment:
         )
         trial_seq = trial_seq.sample(frac=1).reset_index(drop=True)
         if save:
-            results_table = slab.ResultsTable(columns=self.columns, subject=self.subject, folder="/Results/local")
+            results_table = slab.ResultsTable(columns=self.columns, subject=self.subject)
         for seq_idx, seq_row in trial_seq.iterrows():
             standard_angle = seq_row["standard_angle"]
             comparison_angle = seq_row["comparison_angle"]
@@ -45,11 +47,11 @@ class Experiment:
             comparison_cue = seq_row["comparison_cue"]
             trial_type = standard_cue + "-->" + comparison_cue
 
-            standard_stim = generate_stim(self.standard_center_frequency)
-            if self.standard_center_frequency == self.comparison_center_frequency:
-                comparison_stim = copy.deepcopy(standard_stim)
-            else:
-                comparison_stim = generate_stim(self.comparison_center_frequency)
+            standard_stim = generate_stim(self.standard_center_frequency, mixing_gain=0.5)
+            # if self.standard_center_frequency == self.comparison_center_frequency:
+            #     comparison_stim = copy.deepcopy(standard_stim)
+            # else:
+            comparison_stim = generate_stim(self.comparison_center_frequency, mixing_gain=self.mixing_gain)
 
             standard_stim = apply_cue(standard_stim, standard_cue, standard_angle, self.standard_center_frequency, head_radius=self.head_radius)
             comparison_stim = apply_cue(comparison_stim, comparison_cue, comparison_angle, self.comparison_center_frequency, head_radius=self.head_radius)
@@ -113,6 +115,7 @@ class Experiment:
                     datetime_onset=datetime_onset,
                     stim_type=self.stim_type,
                     trial_type=trial_type,
+                    mixing_gain=self.mixing_gain,
                     trial_index=seq_idx,
                     standard_angle=standard_angle,
                     standard_value=standard_value,  # (ms or dB) subject specific based on HRTF

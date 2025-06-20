@@ -22,8 +22,11 @@ def ask_to_continue(prompt="Do you want to continue? (y): ", expected="y"):
         print(f"Please type '{expected}' to continue.")
 
 
-def get_df(subject, standard_center_frequency=None, comparison_center_frequency=None, exp_folder="local"):
-    folder_path = DIR / "Results" / exp_folder / subject
+def get_df(subject, standard_center_frequency=None, comparison_center_frequency=None,
+           # exp_folder="local"
+           ):
+    # folder_path = DIR / "Results" / exp_folder / subject
+    folder_path = DIR / "Results" / subject
     csv_files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
     csv_files = sorted(
         csv_files,
@@ -61,12 +64,16 @@ def get_df(subject, standard_center_frequency=None, comparison_center_frequency=
     return df_final
 
 
-def get_df_all(exp_folder="single_cue_exp"):
-    folder_path = DIR / "Results" / exp_folder
+def get_df_all(
+        # exp_folder="combined_cue_exp"
+):
+    # folder_path = DIR / "Results" / exp_folder
+    folder_path = DIR / "Results"
     subjects = [f for f in os.listdir(folder_path) if not f.startswith('.')]
     dfs = []
     for subject in subjects:
-        df_sub = get_df(subject, exp_folder=exp_folder)
+        # df_sub = get_df(subject, exp_folder=exp_folder)
+        df_sub = get_df(subject)
         dfs.append(df_sub)
     df_all = pd.concat(dfs, ignore_index=True)
     return df_all
@@ -160,7 +167,9 @@ def get_psychometric_estimates(g, save_fig=False):
 
 
 def get_model_table(subject, standard_center_frequency, comparison_center_frequency):
-    combined_df = get_df(subject, standard_center_frequency, comparison_center_frequency, exp_folder="single_cue_exp")
+    combined_df = get_df(subject, standard_center_frequency, comparison_center_frequency,
+                         # exp_folder="combined_cue_exp"
+                         )
     df_group = combined_df.groupby(
         ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
     df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
@@ -388,7 +397,7 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
     title = f"{subject} at {standard_center_frequency}-->{comparison_center_frequency}Hz"
     fig.suptitle(title, fontsize=14)
     if save_fig:
-        ps_figure_folder_path = DIR / Path("figures") / Path("single_cue_exp")
+        ps_figure_folder_path = DIR / Path("figures") / Path("combined_cue_exp")
         ps_figure_file_path = ps_figure_folder_path / Path(title)
         Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
         plt.savefig(ps_figure_file_path, dpi=200)

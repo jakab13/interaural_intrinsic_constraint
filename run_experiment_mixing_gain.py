@@ -1,7 +1,7 @@
 from experiment import Experiment
 from experiment_analysis import *
 
-subject = "jakab_mg"
+subject = "jakab_mg_2"
 
 exp = Experiment(subject)
 
@@ -41,4 +41,4 @@ exp.run_sequence()
 # Plotting ==================================================================
 
 df = get_df(subject, exp.standard_center_frequency, exp.comparison_center_frequency)
-sns.lmplot(df, x="comparison_angle_abs", y="score_abs", hue="mixing_gain", logistic=True)
+sns.lineplot(df, x="comparison_angle_abs", y="score_abs", hue="mixing_gain", marker="o", errorbar=None)

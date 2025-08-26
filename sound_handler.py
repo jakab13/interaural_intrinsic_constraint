@@ -83,4 +83,5 @@ def generate_stim(center_frequency, mixing_gain=0.5, level=80):
     level_aweight = stim.aweight().level
     level_diff = stim.level - level_aweight
     stim.level += level_diff
+    stim.level -= 3
     return stim

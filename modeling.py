@@ -92,8 +92,8 @@ for fig_idx, standard_cue, comparison_cue in zip([0, 1, 2, 3], ["T", "L", "L", "
     x_range = np.linspace(0, 35, 5000)
 
     sigma_T_0 = 1.6
-    sigma_L_0 = 0.9
-    sigma_T_diff = 0.01
+    sigma_L_0 = 1.1
+    sigma_T_diff = 0.00
     sigma_L_diff = 0.00
 
     sigma_T_range = get_sigma(x_range, sigma_T_0, sigma_T_diff)
@@ -137,19 +137,19 @@ for fig_idx, standard_cue, comparison_cue in zip([0, 1, 2, 3], ["T", "L", "L", "
 
     # print(f"At {x_T} with Standard: {standard_cue} - Comparison: {comparison_cue} JND = {(x_JND - x_T)} ")
 
-    row = {
-        "ref_angle": x_T,
-        "standard_cue": standard_cue,
-        "comparison_cue": comparison_cue,
-        "trial_type": standard_cue + "-->" + comparison_cue,
-        "sigma_T_0": sigma_T_0,
-        "sigma_L_0": sigma_L_0,
-        "sigma_T_diff": sigma_T_diff,
-        "sigma_L_diff": sigma_L_diff,
-        "JND": x_JND - x_T
-    }
-    df_row = pd.DataFrame([row])
-    df = pd.concat([df, df_row], ignore_index=True)
+    # row = {
+    #     "ref_angle": x_T,
+    #     "standard_cue": standard_cue,
+    #     "comparison_cue": comparison_cue,
+    #     "trial_type": standard_cue + "-->" + comparison_cue,
+    #     "sigma_T_0": sigma_T_0,
+    #     "sigma_L_0": sigma_L_0,
+    #     "sigma_T_diff": sigma_T_diff,
+    #     "sigma_L_diff": sigma_L_diff,
+    #     "JND": x_JND - x_T
+    # }
+    # df_row = pd.DataFrame([row])
+    # df = pd.concat([df, df_row], ignore_index=True)
 
     pdf_standard = norm.pdf(x_range, y_PSE, sigma_PSE)
     pdf_comparison = norm.pdf(x_range, y_JND, sigma_JND)

@@ -8,7 +8,7 @@ def get_response(trial_count=None, max_count=None):
         if response == "49" or response == "1":
             response = "left"
             break
-        elif response == "51" or response == "2":
+        elif response == "51" or response == "4":
             response = "right"
             break
         else:

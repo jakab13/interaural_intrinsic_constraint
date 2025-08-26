@@ -14,7 +14,7 @@ def generate_trial_sequence(
     elif comparison_cue == "ILD":
         comparison_angle_conditions = np.asarray([-20, -15, -10, -5, -5, 0, 0, 5, 5, 10, 15, 20])
     elif comparison_cue == "BOTH":
-        comparison_angle_conditions = np.asarray([-14, -10, -6, -3, -3, 0, 0, 3, 3, 6, 10, 14])
+        comparison_angle_conditions = np.asarray([-10, -6, -4, -2, -2, 0, 0, 2, 2, 4, 6, 10])
     comparison_angle_conditions = comparison_angle_conditions + PSE_angle
     df_trial_sequence = pd.DataFrame()
     for comparison_angle in comparison_angle_conditions:

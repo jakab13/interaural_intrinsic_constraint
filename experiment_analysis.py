@@ -23,10 +23,10 @@ def ask_to_continue(prompt="Do you want to continue? (y): ", expected="y"):
 
 
 def get_df(subject, standard_center_frequency=None, comparison_center_frequency=None,
-           # exp_folder="across_frequencies"
+           exp_folder="across_frequencies"
            ):
-    # folder_path = DIR / "Results" / exp_folder / subject
-    folder_path = DIR / "Results" / subject
+    folder_path = DIR / "Results" / exp_folder / subject
+    # folder_path = DIR / "Results" / subject
     csv_files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
     csv_files = sorted(
         csv_files,
@@ -66,16 +66,16 @@ def get_df(subject, standard_center_frequency=None, comparison_center_frequency=
 
 
 def get_df_all(
-        # exp_folder="across_frequencies",
+        exp_folder="across_frequencies",
         subjects=None
 ):
-    # folder_path = DIR / "Results" / exp_folder
-    folder_path = DIR / "Results"
+    folder_path = DIR / "Results" / exp_folder
+    # folder_path = DIR / "Results"
     subjects = subjects or [f for f in os.listdir(folder_path) if not f.startswith('.')]
     dfs = []
     for subject in subjects:
-        # df_sub = get_df(subject, exp_folder=exp_folder)
-        df_sub = get_df(subject)
+        df_sub = get_df(subject, exp_folder=exp_folder)
+        # df_sub = get_df(subject)
         dfs.append(df_sub)
     df_all = pd.concat(dfs, ignore_index=True)
     return df_all
@@ -118,7 +118,7 @@ def get_psychometric_estimates(g, save_fig=False):
     else:
         res = ps.psignifit(
             data.values,
-            sigmoid="logistic",
+            sigmoid="gauss",
             experiment_type="equal asymptote"
         )
         print(f"Calculated psignifit estimates for {title}")
@@ -170,7 +170,8 @@ def get_psychometric_estimates(g, save_fig=False):
 
 def get_model_table(subject, standard_center_frequency, comparison_center_frequency):
     combined_df = get_df(subject, standard_center_frequency, comparison_center_frequency,
-                         # exp_folder="combined_cue_exp"
+                         # exp_folder="combined_cue"
+                            exp_folder = "single_cue"
                          )
     df_group = combined_df.groupby(
         ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
@@ -304,7 +305,7 @@ def unique_everseen(seq, key=None):
 def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, weak_cue="ITD", strong_cue="ILD",
              plot_parameter=True, plot_JND=False, plot_PSE_delta=False, save_fig=False):
     df = get_model_table(subject, standard_center_frequency, comparison_center_frequency)
-    # df = df[~(df.is_control)]
+    df = df[~(df.is_control)]
     trial_type_weak_to_weak = f"{weak_cue}-->{weak_cue}"
     trial_type_strong_to_strong = f"{strong_cue}-->{strong_cue}"
     trial_type_weak_to_strong = f"{weak_cue}-->{strong_cue}"
@@ -334,7 +335,7 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
         "ITD-->BOTH": {"color": cmap(5), "ls": "-", "JND_offset": -0.08},
         "ILD-->BOTH": {"color": cmap(5), "ls": "-", "JND_offset": -0.08}
     }
-    fig, (ax_0, ax_1, ax_2) = plt.subplots(1, 3, sharey=False, width_ratios=[6, 1, 2], figsize=(16, 6))
+    fig, (ax_0, ax_1, ax_2) = plt.subplots(1, 3, sharey=False, width_ratios=[6, 1, 2], figsize=(10, 5))
     ax_0.axhline(y=1.0, color="lightgrey", alpha=.3)
     ax_0.axhline(y=0.5, color="lightgrey", alpha=.3)
     ax_0.axvline(x=0, color="lightgrey", alpha=.3)
@@ -377,30 +378,48 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
     PSE_delta_TL_pred = abs(1 - df.loc[df.trial_type == trial_type_weak_to_weak, "slope"].values[0] / df.loc[df.trial_type == trial_type_strong_to_strong, "slope"].values[0]) * PSE_TT
     PSE_delta_LT_pred = abs(1 - df.loc[df.trial_type == trial_type_strong_to_strong, "slope"].values[0] / df.loc[df.trial_type == trial_type_weak_to_weak, "slope"].values[0]) * PSE_LL
     if plot_PSE_delta:
-        rect1 = matplotlib.patches.Rectangle((PSE_TL, 0.06), PSE_TT - PSE_TL, 0.02, color="#17BFCF")
-        rect2 = matplotlib.patches.Rectangle((PSE_LT, 0.04), PSE_LL - PSE_LT, 0.02, color="#9FD9E4")
-        ax_0.add_patch(rect1)
-        ax_0.add_patch(rect2)
+        # rect1 = matplotlib.patches.Rectangle((PSE_TL, 0.06), PSE_TT - PSE_TL, 0.02, color=line_kws["BOTH-->ILD"]["color"])  # color="#17BFCF"
+        # rect2 = matplotlib.patches.Rectangle((PSE_LT, 0.04), PSE_LL - PSE_LT, 0.02, color=line_kws["ILD-->BOTH"]["color"])  # color="#9FD9E4"
+        # ax_0.add_patch(rect1)
+        # ax_0.add_patch(rect2)
 
-        sns.barplot(data=[PSE_delta_TL, PSE_delta_LT], ax=ax_1, palette=["#17BFCF", "#9FD9E4"])
+        # y-positions: use the vertical center of your old rectangles
+        y1 = 0.06 + 0.02 / 2
+        y2 = 0.04 + 0.02 / 2
 
-        PSE_delta_TL_pred_bar = matplotlib.patches.Rectangle((-0.45, PSE_delta_TL_pred + 0.03), 0.9, 0.06, color='#28CD41')
-        ax_1.add_patch(PSE_delta_TL_pred_bar)
+        # Colors from your mapping
+        c1 = line_kws["ITD-->ILD"]["color"]
+        c2 = line_kws["ILD-->ITD"]["color"]
 
-        PSE_delta_LT_pred_bar = matplotlib.patches.Rectangle((0.55, PSE_delta_LT_pred + 0.03), 0.9, 0.06, color='#28CD41')
-        ax_1.add_patch(PSE_delta_LT_pred_bar)
+        # Arrow 1: PSE_TL -> PSE_TT
+        ax_0.annotate("", xy=(PSE_TT, y1), xytext=(PSE_TL, y1),
+            arrowprops=dict(arrowstyle="<|-", color=c1, lw=4,
+                            shrinkA=0, shrinkB=0, mutation_scale=14), zorder=10)
 
-        zero_pred_bar = matplotlib.patches.Rectangle((-0.45, 0.03), 0.9, 0.06, color='#FF3B30')
-        ax_1.add_patch(zero_pred_bar)
+        # Arrow 2: PSE_LT -> PSE_LL
+        ax_0.annotate("", xy=(PSE_LL, y2), xytext=(PSE_LT, y2),
+            arrowprops=dict(arrowstyle="<|-", color=c2, lw=4,
+                            shrinkA=0, shrinkB=0, mutation_scale=14), zorder=10)
 
-        zero_pred_bar2 = matplotlib.patches.Rectangle((0.55, 0.03), 0.9, 0.06, color='#FF3B30')
-        ax_1.add_patch(zero_pred_bar2)
+        sns.barplot(data=[-PSE_delta_TL, PSE_delta_LT], ax=ax_1, palette=[c1, c2])
+
+        # Cue-scaling predictions
+        ax_1.plot([-0.45, 0.45], [-PSE_delta_TL_pred, -PSE_delta_TL_pred], color="black", linewidth=2, linestyle="-", solid_capstyle="butt",
+                  clip_on=False, zorder=10)
+        ax_1.plot([0.55, 1.45], [PSE_delta_LT_pred, PSE_delta_LT_pred], color="black", linewidth=2, linestyle="-", solid_capstyle="butt",
+                  clip_on=False, zorder=10)
+
+        # Cue-uncertainty predictions
+        ax_1.plot([-0.45, 0.45], [0, 0], color="black", linewidth=2, linestyle="--", solid_capstyle="butt", clip_on=False, zorder=10)
+        ax_1.plot([0.55, 1.45], [0, 0], color="black", linewidth=2, linestyle="--", solid_capstyle="butt", clip_on=False, zorder=10)
 
         ax_1.spines['right'].set_visible(False)
         ax_1.spines['top'].set_visible(False)
         ax_1.spines['bottom'].set_visible(False)
 
-        ax_1.set_title("ΔPSE", fontsize=14)
+        ax_1.set_title("ΔPSEs", fontsize=14)
+
+    ax_1.set_xticklabels(["ITD-->ILD", "ILD-->ITD"])
 
     ax_0.set_yticks([0.5, 0.84, 1.])
     ax_0.legend()
@@ -413,6 +432,19 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
                 hue_order=hue_order,
                 order=trial_type_order,
                 palette=palette)
+
+    for lbl in ax_1.get_xticklabels():
+        lbl.set_rotation(25)
+        lbl.set_horizontalalignment("right")  # or "center"
+        # lbl.set_rotation_mode("anchor")  # <- keeps the anchor on the tick
+        lbl.set_verticalalignment("top")  # looks nicer for angled labels
+
+    for lbl in ax_2.get_xticklabels():
+        lbl.set_rotation(25)
+        lbl.set_horizontalalignment("right")  # or "center"
+        # lbl.set_rotation_mode("anchor")  # <- keeps the anchor on the tick
+        lbl.set_verticalalignment("top")  # looks nicer for angled labels
+
     if len(df) > 3:
         for bar, curr_trial_type in zip(ax_2.patches, hue_order):
             x = bar.get_x()
@@ -424,37 +456,55 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
             JND_pred_IC = df.loc[df.trial_type == curr_trial_type, "JND_pred_IC"].values[0]
 
             # Plot errorbars
-            ax_2.vlines(x=x + width/2, ymin=JND_ci_95_low, ymax=JND_ci_95_high, color="black")
+            # ax_2.vlines(x=x + width/2, ymin=JND_ci_95_low, ymax=JND_ci_95_high, color="black")
             # ax_1.hlines(y=JND_ci_95_high, xmin=x + width/2 - 0.05, xmax=x + width/2 + 0.05, color="black", alpha=.3)
             # ax_1.hlines(y=JND_ci_95_low, xmin=x + width / 2 - 0.05, xmax=x + width / 2 + 0.05, color="black", alpha=.3)
 
             # Plot model predictions
-            SDT_pred_top = matplotlib.patches.Rectangle((x * 0.95, JND_pred_no_prior), x * 1.05 + width - x * 0.95, 0.06,
-                                                color='#FF3B30')
-            ax_2.add_patch(SDT_pred_top)
-            IC_pred_top = matplotlib.patches.Rectangle((x * 0.95, JND_pred_IC),
-                                                        x * 1.05 + width - x * 0.95, 0.06,
-                                                        color='#28CD41')
-            ax_2.add_patch(IC_pred_top)
+            # SDT_pred_top = matplotlib.patches.Rectangle((x * 0.95, JND_pred_no_prior), x * 1.05 + width - x * 0.95, 0.06,
+            #                                     color='black')
+            # ax_2.add_patch(SDT_pred_top)
+            # IC_pred_top = matplotlib.patches.Rectangle((x * 0.95, JND_pred_IC),
+            #                                             x * 1.05 + width - x * 0.95, 0.06,
+            #                                             color='black')
+            # ax_2.add_patch(IC_pred_top)
+
+
+            ax_2.plot([x * 0.95, x * 1.05 + width], [JND_pred_IC, JND_pred_IC], color="black", linewidth=2,
+                      linestyle="-", solid_capstyle="butt",
+                      clip_on=False, zorder=10)
+
+            # Cue-uncertainty predictions
+            ax_2.plot([x * 0.95, x * 1.05 + width], [JND_pred_no_prior, JND_pred_no_prior], color="black", linewidth=2, linestyle="--", solid_capstyle="butt",
+                      clip_on=False, zorder=10)
 
     ax_2.set_ylim(0, df["JND_ci_95_high"].max() * 1.1)
-    ax_1.set_ylim(0, df["JND_ci_95_high"].max() * 1.1)
-    ax_2.set_xlabel("Cue comparisons", fontsize=14)
+    ax_1.set_ylim(-10, 10)
+    # ax_2.set_xlabel("Cue comparisons", fontsize=14)
     ax_2.set_ylabel("JND [°]", fontsize=14)
-    ax_2.set_title("Discrimination thresholds", fontsize=14)
-    line_1 = matplotlib.lines.Line2D([], [], ls="-", color='#FF3B30', linewidth=5, label="Joint Variance Prediction")
-    line_2 = matplotlib.lines.Line2D([], [], ls="-", color='#28CD41', linewidth=5, label="Comparison Variance Prediction")
+    ax_2.set_title("JNDs", fontsize=14)
+    line_1 = matplotlib.lines.Line2D([], [], ls="--",
+                                     # color='#FF3B30',
+                                     color='black',
+                                     linewidth=2, label="Cue-uncertainty")
+    line_2 = matplotlib.lines.Line2D([], [], ls="-",
+                                     # color='#28CD41',
+                                     color='black',
+                                     linewidth=2, label="Cue-scaling")
     ax_2.legend(handles=[line_1, line_2], loc="upper left")
     ax_2.spines['right'].set_visible(False)
     ax_2.spines['top'].set_visible(False)
 
     title = f"{subject} at {standard_center_frequency}-->{comparison_center_frequency}Hz"
     fig.suptitle(title, fontsize=14)
+    fig.subplots_adjust(bottom=0.18)
     if save_fig:
-        ps_figure_folder_path = DIR / Path("figures") / Path("combined_cue_exp")
+        # ps_figure_folder_path = DIR / Path("figures") / Path("combined_cue")
+        ps_figure_folder_path = DIR / Path("figures") / Path("single_cue")
         ps_figure_file_path = ps_figure_folder_path / Path(title)
         Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
-        plt.savefig(ps_figure_file_path, dpi=200)
+        plt.tight_layout()
+        plt.savefig(str(ps_figure_file_path) + ".png", dpi=400, format="png")
         plt.savefig(str(ps_figure_file_path) + ".svg", format="svg")
         plt.close()
 

@@ -260,6 +260,38 @@ def add_pse_predictions(df: pd.DataFrame) -> pd.DataFrame:
     out = out.drop(columns=["__grp__"])
     return out
 
+
+def add_pse_deltas(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add delta columns as (pse or predicted pse) MINUS standard_angle_abs:
+      - pse_delta
+      - pse_delta_uncertainty  (if pse_pred_uncertainty exists)
+      - pse_delta_scaling      (if pse_pred_scaling exists)
+    Also removes a legacy 'pse_diff' column if present.
+    """
+    out = df.copy()
+    ang = pd.to_numeric(out.get("standard_angle_abs"), errors="coerce")
+    pse = pd.to_numeric(out.get("pse"), errors="coerce")
+
+    # observed
+    out["pse_delta"] = pse - ang
+
+    # predictions (only if present)
+    if "pse_pred_uncertainty" in out.columns:
+        p_unc = pd.to_numeric(out["pse_pred_uncertainty"], errors="coerce")
+        out["pse_delta_uncertainty"] = p_unc - ang
+
+    if "pse_pred_scaling" in out.columns:
+        p_sca = pd.to_numeric(out["pse_pred_scaling"], errors="coerce")
+        out["pse_delta_scaling"] = p_sca - ang
+
+    # drop legacy column if it exists
+    if "pse_diff" in out.columns:
+        out = out.drop(columns=["pse_diff"])
+
+    return out
+
+
 # ---------- one-shot convenience ----------
 def prepare_selected_with_pse_and_predictions(
     path_in: Path | str = DEFAULT_SELECTED,
@@ -276,6 +308,7 @@ def prepare_selected_with_pse_and_predictions(
     df = rename_threshold_to_pse(df)
     df = add_pse_diff(df, pse_col="pse")
     df = add_pse_predictions(df)   # adds: pse_pred_uncertainty, pse_pred_scaling
+    df = add_pse_deltas(df)
     df = add_jnd_predictions(df)   # adds: jnd_pred_uncertainty, jnd_pred_scaling
     df = add_prediction_errors(df) # adds: *_pred_error_*
 

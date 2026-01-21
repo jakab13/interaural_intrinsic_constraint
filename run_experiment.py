@@ -68,6 +68,6 @@ exp.run_sequence()
 plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ILD", strong_cue="BOTH")
 
 # Plot with JND values
-# plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ILD", strong_cue="BOTH",
-#          plot_parameter=False, plot_JND=True)
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ITD", strong_cue="BOTH",
+         plot_parameter=False, plot_JND=True)
 

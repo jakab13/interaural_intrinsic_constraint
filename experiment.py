@@ -50,7 +50,8 @@ class Experiment:
             standard_stim = generate_stim(self.standard_center_frequency, mixing_gain=0.5)
             if self.standard_center_frequency == self.comparison_center_frequency:
                 comparison_stim = copy.deepcopy(standard_stim)
-            # comparison_stim = generate_stim(self.comparison_center_frequency, mixing_gain=self.mixing_gain)
+            else:
+                comparison_stim = generate_stim(self.comparison_center_frequency, mixing_gain=self.mixing_gain)
 
             standard_stim = apply_cue(standard_stim, standard_cue, standard_angle, self.standard_center_frequency, head_radius=self.head_radius)
             comparison_stim = apply_cue(comparison_stim, comparison_cue, comparison_angle, self.comparison_center_frequency, head_radius=self.head_radius)

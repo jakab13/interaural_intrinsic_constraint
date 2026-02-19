@@ -22,10 +22,11 @@ with open(ILS_PATH, "rb") as f:
 # ils is expected to be a dict with keys like:
 # 'frequencies' (n_bands,), 'azimuths' (n_az,), 'level_diffs_left' (n_bands, n_az), 'level_diffs_right' (n_bands, n_az)
 # azimuths = np.asarray(ils["azimuths"], dtype=float)
-azimuths = np.linspace(-30, 30, 1000)
+azimuths = np.linspace(0, 30, 1000)
 
 # Frequencies you want
-freqs_of_interest = [500, 1300, 1800]
+# freqs_of_interest = [500, 1300, 1800]
+freqs_of_interest = [150, 250, 500, 750, 1000, 1250, 1500]
 
 def azimuth_to_ild(azimuth, frequency=2000, ils=None):
     level_diffs_left = ils['level_diffs_left']
@@ -49,6 +50,21 @@ def ild_from_ils(azis_deg: np.ndarray, freq_hz: float, ils_dict: dict) -> np.nda
         ild_vals.append(right_db - left_db)
     return np.asarray(ild_vals, dtype=float)
 
+def ild_left_from_ils(azis_deg: np.ndarray, freq_hz: float, ils_dict: dict) -> np.ndarray:
+    ild_vals_left = []
+    for a in azis_deg:
+        left_db, right_db = azimuth_to_ild(a, frequency=freq_hz, ils=ils_dict)
+        ild_vals_left.append(left_db)
+    return np.asarray(ild_vals_left, dtype=float)
+
+
+def ild_right_from_ils(azis_deg: np.ndarray, freq_hz: float, ils_dict: dict) -> np.ndarray:
+    ild_vals_right = []
+    for a in azis_deg:
+        left_db, right_db = azimuth_to_ild(a, frequency=freq_hz, ils=ils_dict)
+        ild_vals_right.append(right_db)
+    return np.asarray(ild_vals_right, dtype=float)
+
 # ---------- ITD from slab analytic mapping ----------
 # slab.Binaural.azimuth_to_itd returns ITD in seconds (negative means source to the left)
 def itd_from_slab(azis_deg: np.ndarray, freq_hz: float) -> np.ndarray:
@@ -59,31 +75,52 @@ def itd_from_slab(azis_deg: np.ndarray, freq_hz: float) -> np.ndarray:
 ild_curves = {f: ild_from_ils(azimuths, f, ils) for f in freqs_of_interest}
 itd_curves = {f: itd_from_slab(azimuths, f) for f in freqs_of_interest}
 
+ild_curves_left = {f: ild_left_from_ils(azimuths, f, ils) for f in freqs_of_interest}
+ild_curves_right = {f: ild_right_from_ils(azimuths, f, ils) for f in freqs_of_interest}
+
 # ---------- colour control (THIS IS THE KEY PART) ----------
 blue_cmap   = plt.get_cmap("Blues")
 orange_cmap = plt.get_cmap("Oranges")
 
 # choose perceptually balanced intensities (avoid very light & very dark)
-blue_levels   = [0.45, 0.65, 0.85]
+blue_levels   = np.linspace(0.2, 0.8, len(freqs_of_interest))
 orange_levels = [0.45, 0.55, 0.65]
 
 # ---------- plotting ----------
-fig, (ax_ild, ax_itd) = plt.subplots(
-    1, 2, figsize=(10, 4), sharex=True
+# fig, (ax_ild, ax_itd) = plt.subplots(
+#     1, 2, figsize=(10, 4), sharex=True
+# )
+
+fig, ax_ild = plt.subplots(
+    1, 1, figsize=(4, 4), sharex=True
 )
 
 ax_ild.axhline(0, linewidth=1, ls="--", color="lightgrey")
 ax_ild.axvline(0, linewidth=1, ls="--", color="lightgrey")
-ax_itd.axhline(0, linewidth=1, ls="--", color="lightgrey")
-ax_itd.axvline(0, linewidth=1, ls="--", color="lightgrey")
+# ax_itd.axhline(0, linewidth=1, ls="--", color="lightgrey")
+# ax_itd.axvline(0, linewidth=1, ls="--", color="lightgrey")
 
 # --- ILD ---
 for f, lvl in zip(freqs_of_interest, blue_levels):
+    # ax_ild.plot(
+    #     azimuths,
+    #     ild_curves_left[f],
+    #     color=blue_cmap(lvl),
+    #     ls=":",
+    #     label=f"{f} Hz - Left"
+    # )
+    # ax_ild.plot(
+    #     azimuths,
+    #     ild_curves_right[f],
+    #     color=blue_cmap(lvl),
+    #     label=f"{f} Hz - Right"
+    # )
     ax_ild.plot(
         azimuths,
         ild_curves[f],
         color=blue_cmap(lvl),
-        label=f"{f} Hz"
+        label=f"{f} Hz",
+        lw=3
     )
 
 
@@ -93,20 +130,20 @@ ax_ild.set_title("ILD vs Azimuth")
 ax_ild.legend(frameon=False)
 
 # --- ITD ---
-for f, lvl in zip(freqs_of_interest, orange_levels):
-    ax_itd.plot(
-        azimuths,
-        itd_curves[f] * 1e6,
-        color=orange_cmap(lvl),
-        label=f"{f} Hz"
-    )
-
-
-ax_itd.set_xlabel("Azimuth (deg)")
-ax_itd.set_ylabel("ITD (µs)")
-ax_itd.set_title("ITD vs Azimuth")
-ax_itd.legend(frameon=False)
+# for f, lvl in zip(freqs_of_interest, orange_levels):
+#     ax_itd.plot(
+#         azimuths,
+#         itd_curves[f] * 1e6,
+#         color=orange_cmap(lvl),
+#         label=f"{f} Hz"
+#     )
+#
+#
+# ax_itd.set_xlabel("Azimuth (deg)")
+# ax_itd.set_ylabel("ITD (µs)")
+# ax_itd.set_title("ITD vs Azimuth")
+# ax_itd.legend(frameon=False)
 
 plt.tight_layout()
-fig.savefig("Analysis/sound/ILD and ITD vs azimuth.png", dpi=300, bbox_inches="tight", format="png")
+# fig.savefig("Analysis/sound/ILD and ITD vs azimuth.png", dpi=300, bbox_inches="tight", format="png")
 plt.show()

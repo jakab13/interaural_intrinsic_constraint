@@ -25,8 +25,8 @@ def ask_to_continue(prompt="Do you want to continue? (y): ", expected="y"):
 def get_df(subject, standard_center_frequency=None, comparison_center_frequency=None,
            exp_folder="across_frequencies"
            ):
-    folder_path = DIR / "Results" / exp_folder / subject
-    # folder_path = DIR / "Results" / subject
+    # folder_path = DIR / "Results" / exp_folder / subject
+    folder_path = DIR / "Results" / subject
     csv_files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
     csv_files = sorted(
         csv_files,
@@ -69,8 +69,8 @@ def get_df_all(
         exp_folder="across_frequencies",
         subjects=None
 ):
-    folder_path = DIR / "Results" / exp_folder
-    # folder_path = DIR / "Results"
+    # folder_path = DIR / "Results" / exp_folder
+    folder_path = DIR / "Results"
     subjects = subjects or [f for f in os.listdir(folder_path) if not f.startswith('.')]
     dfs = []
     for subject in subjects:
@@ -93,6 +93,12 @@ def get_psychometric_estimates(g, save_fig=False):
     ps_result_folder_path = DIR / Path("ps_results") / Path(subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
     Path(ps_result_folder_path).mkdir(parents=True, exist_ok=True)
     ps_result_file_path = ps_result_folder_path / Path(title + ".json")
+    # g["comparison_value_abs"] = np.where(
+    #     g["standard_angle"] < 0,
+    #     -g["comparison_value"],
+    #     g["comparison_value"]
+    # )
+    # g["comparison_value_abs"] = g["comparison_value_abs"].round(2)
     data = g.groupby("comparison_angle_abs", as_index=False).agg(
         {"score_abs": "sum", g.columns[0]: "count"}).rename(
         columns={g.columns[0]: 'n_total'})
@@ -163,7 +169,8 @@ def get_psychometric_estimates(g, save_fig=False):
         "eta_ci_95_low": eta_ci_95_low,
         "eta_ci_95_high": eta_ci_95_high,
         "slope": slope,
-        "is_control": is_control
+        "is_control": is_control,
+        # "standard_value_abs": g["standard_value"].abs().mean()
     }
     return pd.Series(row)
 
@@ -171,7 +178,7 @@ def get_psychometric_estimates(g, save_fig=False):
 def get_model_table(subject, standard_center_frequency, comparison_center_frequency):
     combined_df = get_df(subject, standard_center_frequency, comparison_center_frequency,
                          # exp_folder="combined_cue"
-                            exp_folder = "single_cue"
+                         #    exp_folder = "scaling"
                          )
     df_group = combined_df.groupby(
         ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
@@ -310,17 +317,17 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
     trial_type_strong_to_strong = f"{strong_cue}-->{strong_cue}"
     trial_type_weak_to_strong = f"{weak_cue}-->{strong_cue}"
     trial_type_strong_to_weak = f"{strong_cue}-->{weak_cue}"
-    if len(df) > 3:
-        JND_TT = df.loc[df.trial_type == trial_type_weak_to_weak, "JND"].values[0]
-        JND_LL = df.loc[df.trial_type == trial_type_strong_to_strong, "JND"].values[0]
-        sigma_TT = JND_TT / np.sqrt(2)
-        sigma_LL = JND_LL / np.sqrt(2)
-        # JND predictions without a prior
-        df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
-        df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
-        # JND predictions with IC model
-        df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_IC"] = JND_TT
-        df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_IC"] = JND_LL
+    # if len(df) > 3:
+    #     JND_TT = df.loc[df.trial_type == trial_type_weak_to_weak, "JND"].values[0]
+    #     JND_LL = df.loc[df.trial_type == trial_type_strong_to_strong, "JND"].values[0]
+    #     sigma_TT = JND_TT / np.sqrt(2)
+    #     sigma_LL = JND_LL / np.sqrt(2)
+    #     # JND predictions without a prior
+    #     df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
+    #     df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
+    #     # JND predictions with IC model
+    #     df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_IC"] = JND_TT
+    #     df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_IC"] = JND_LL
 
     # ps_result_file_paths = [f for f in os.listdir(folder_path) if f.endswith('.json')]
     cmap = matplotlib.cm.get_cmap('tab20')
@@ -500,7 +507,8 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
     fig.subplots_adjust(bottom=0.18)
     if save_fig:
         # ps_figure_folder_path = DIR / Path("figures") / Path("combined_cue")
-        ps_figure_folder_path = DIR / Path("figures") / Path("single_cue")
+        # ps_figure_folder_path = DIR / Path("figures") / Path("single_cue")
+        ps_figure_folder_path = DIR / Path("figures")
         ps_figure_file_path = ps_figure_folder_path / Path(title)
         Path(ps_figure_folder_path).mkdir(parents=True, exist_ok=True)
         plt.tight_layout()

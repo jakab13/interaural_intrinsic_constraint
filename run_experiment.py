@@ -1,36 +1,36 @@
 from experiment import Experiment
 from experiment_analysis import *
 
-subject = "vp_12"
+subject = "jakab_high_ILD"
 
 exp = Experiment(subject)
 
 # exp.mixing_gain = 1
 
-exp.standard_center_frequency = 500
-exp.comparison_center_frequency = 500
+exp.standard_center_frequency = 10000
+exp.comparison_center_frequency = 2000
 exp.head_radius = 8.08 # in cm
-reference_angle = 8
-PSE_estimate = 4  # initial guess of PSE
+reference_angle = 3.5
+PSE_estimate = 8  # initial guess of PSE
 
 # Familiarisation (without saving data)
-exp.n_reps = 1
-exp.run_sequence(save=False)
+# exp.n_reps = 1
+# exp.run_sequence(save=False)
 
 # Number of repetitions for one sequence
 exp.n_reps = 4  # should be an even number
 
 # ITD-->BOTH =====================================
 exp.standard_cue = "ILD"
-exp.comparison_cue = "BOTH"
+exp.comparison_cue = "ILD"
 exp.standard_angle = reference_angle
 exp.PSE_angle = PSE_estimate
 exp.run_sequence()
 
 # Plot psychometric functions
-plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ILD", strong_cue="BOTH")
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ILD", strong_cue="ILD")
 
-PSE_estimate = get_PSE(subject, "ILD", "BOTH", reference_angle, exp.standard_center_frequency)
+PSE_estimate = get_PSE(subject, "ILD", "ILD", reference_angle, exp.standard_center_frequency)
 
 
 # 1 ITD-->ITD =====================================

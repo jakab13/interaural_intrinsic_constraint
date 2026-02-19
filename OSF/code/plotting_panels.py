@@ -10,10 +10,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use("MacOSX")  # for PyCharm on macOS
 import matplotlib.pyplot as plt
-from scipy.stats import wilcoxon
 
-DEFAULT_CSV = Path("Dataframes/psychometrics_params_selected_model_pred.csv")
-OUT_DIR = Path("Plots")
+DEFAULT_CSV = Path("OSF/data/psychometric_parameters.csv")
 X_MIN, X_MAX = -5.0, 25.0
 ARROW_WEAK2STRONG = "#7F7F7F"  # dark grey
 ARROW_STRONG2WEAK = "#C7C7C7"  # light grey
@@ -96,7 +94,7 @@ def load_params(path: Path | str = DEFAULT_CSV) -> pd.DataFrame:
         raise FileNotFoundError(f"Params file not found: {p}")
     df = pd.read_csv(p, low_memory=False)
     # make sure numerics are numeric
-    for c in ("standard_center_frequency","standard_angle_abs","pse","width","gamma","lambda","eta","jnd","pse_delta"):
+    for c in ("standard_center_frequency","reference_angle_abs","pse","width","gamma","lambda","eta","jnd","pse_delta"):
         if c in df.columns: df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 
@@ -148,24 +146,21 @@ def psychometric_y(x: np.ndarray, threshold: float, width: float, gamma: float, 
 
 # ---------- helpers ----------
 def _is_within_cue(df: pd.DataFrame) -> pd.Series:
-    return df["standard_cue"].astype(str) == df["comparison_cue"].astype(str)
+    return df["reference_cue"].astype(str) == df["comparison_cue"].astype(str)
 
-def _select_experiment(df: pd.DataFrame, dataset: str, frequency: Optional[float]) -> pd.DataFrame:
-    out = df[df["dataset"] == dataset].copy()
-    if dataset == "combined_cue":
+def _select_experiment(df: pd.DataFrame, experiment: str, frequency: Optional[float]) -> pd.DataFrame:
+    out = df[df["experiment"] == experiment].copy()
+    if experiment == "combined_cue":
         if frequency is None:
             raise ValueError("For combined_cue please pass frequency=500.0 or 1300.0")
         out = out[np.isclose(pd.to_numeric(out["standard_center_frequency"], errors="coerce"), float(frequency), equal_nan=False)]
     return out
 
-def _x_grid(d: pd.DataFrame, pad: float = 0.25, n: int = 400) -> np.ndarray:
-    xs = pd.to_numeric(d["standard_angle_abs"], errors="coerce").dropna().to_numpy()
+def _x_grid(d: pd.DataFrame, n: int = 400) -> np.ndarray:
+    xs = pd.to_numeric(d["reference_angle_abs"], errors="coerce").dropna().to_numpy()
     p  = pd.to_numeric(d["pse"], errors="coerce").dropna().to_numpy()
     w  = pd.to_numeric(d["width"], errors="coerce").dropna().to_numpy()
     if xs.size == 0 and p.size == 0: return np.linspace(-10, 10, n)
-    xmin = np.nanmin([xs.min(initial=0), p.min(initial=0) - 4*np.nanmean(w) if w.size else 0])
-    xmax = np.nanmax([xs.max(initial=0), p.max(initial=0) + 4*np.nanmean(w) if w.size else 0])
-    rng = xmax - xmin if xmax > xmin else 10.0
     return np.linspace(X_MIN, X_MAX, n)
 
 def _curve_from_row(x: np.ndarray, row: pd.Series) -> np.ndarray:
@@ -241,20 +236,20 @@ def _bootstrap_subject_band(Y: np.ndarray, conf: float = 0.68, n_boot: int = 100
     mean = np.nanmean(Y, axis=0)             # point estimate shown as thick line
     return mean, lo, hi
 
-def _order_trial_types_for_panelD(dataset: str, tt_list: list[str]) -> list[str]:
+def _order_trial_types_for_panelD(experiment: str, tt_list: list[str]) -> list[str]:
     """
     Preferred order for bars on Panel D.
     - combined_cue: C-C, T-C, C-T, T-T  (matches your figure)
     - otherwise: within-cue first (sorted by cue name), then across-cue (sorted).
     """
     tts = [str(t) for t in tt_list]
-    if dataset == "combined_cue":
+    if experiment == "combined_cue":
         desired = ["BOTH-->BOTH", "ITD-->BOTH", "BOTH-->ITD", "ITD-->ITD"]
         # keep only those present, in that order; then append any leftovers
         ordered = [t for t in desired if t in tts] + [t for t in tts if t not in desired]
         return ordered
 
-    if dataset == "single_cue":
+    if experiment == "single_cue":
         desired = ["ILD-->ILD", "ITD-->ILD", "ILD-->ITD", "ITD-->ITD"]
         # keep only those present, in that order; then append any leftovers
         ordered = [t for t in desired if t in tts] + [t for t in tts if t not in desired]
@@ -383,11 +378,11 @@ def _set_int_triplet_yticks(ax, values, pad_ratio: float = 0.10, min_span: int =
 def plot_panels_AB(
     df: pd.DataFrame,
     *,
-    dataset: str,
+    experiment: str,
     frequency: Optional[float] = None,   # required for combined_cue
     save_path: Optional[str | Path] = None,
-    figsize: Tuple[float, float] = (8, 3.5),
-    thin_alpha: float = 0.15,
+    figsize: Tuple[float, float] = (16, 6),
+    thin_alpha: float = 0.35,
     thin_lw: float = 1.,
     thick_lw: float = 2.0,
     ci_alpha: float = 0.25,
@@ -397,7 +392,7 @@ def plot_panels_AB(
       A. within-cue curves (thin per subject; thick median+CI per trial_type) + JND bars
       B. across-cue curves + pse_delta arrows
     """
-    data = _select_experiment(df, dataset=dataset, frequency=frequency)
+    data = _select_experiment(df, experiment=experiment, frequency=frequency)
     if data.empty:
         raise ValueError("No rows for requested experiment.")
 
@@ -443,13 +438,6 @@ def plot_panels_AB(
                         pass
                     if pse_i is not None: PSEs.append(pse_i)
                     if x84_i is not None: X84s.append(x84_i)
-
-            # ----- thick group curve (median over subjects) + 68% band -----
-            if Ycurves:
-                Y = np.vstack(Ycurves)  # rows = subjects, cols = x grid
-                mean, lo, hi = _percentile_band(Y)
-                axA.fill_between(x_common, lo, hi, color=color, alpha=ci_alpha, linewidth=0)
-                axA.plot(x_common, mean, color=color, lw=thick_lw, alpha=0.95, label=short_label(str(tt)))
 
             # JND bar (median)
             pse_med = np.nanmean(pd.to_numeric(g["pse"], errors="coerce"))
@@ -511,13 +499,6 @@ def plot_panels_AB(
                     if pse_i is not None: PSEs.append(pse_i)
                     if x84_i is not None: X84s.append(x84_i)
 
-            # ----- thick group curve (median over subjects) + 68% band -----
-            if Ycurves:
-                Y = np.vstack(Ycurves)  # rows = subjects, cols = x grid
-                mean, lo, hi = _percentile_band(Y)
-                axB.fill_between(x_common, lo, hi, color=color, alpha=ci_alpha, linewidth=0)
-                axB.plot(x_common, mean, color=color, lw=thick_lw, alpha=0.95, label=short_label(str(tt)))
-
             # --- JND bar (median) for across-cue ---
             pse_med = np.nanmean(pd.to_numeric(g["pse"], errors="coerce"))
             jnd_med = np.nanmean(pd.to_numeric(g["jnd"], errors="coerce"))
@@ -534,7 +515,7 @@ def plot_panels_AB(
 
             # --- ΔPSE arrow (median), one-headed and color-coded by cue strength ---
             pse_med = np.nanmedian(pd.to_numeric(g["pse"], errors="coerce"))
-            ang_med = np.nanmedian(pd.to_numeric(g["standard_angle_abs"], errors="coerce"))
+            ang_med = np.nanmedian(pd.to_numeric(g["reference_angle_abs"], errors="coerce"))
             if np.isfinite(pse_med) and np.isfinite(ang_med):
                 # weak/strong decision from within-cue medians (larger JND = weaker)
                 std_cue, cmp_cue = [s.strip() for s in str(tt).split("-->")]
@@ -598,12 +579,10 @@ def plot_panels_AB(
 
     # per-subject median ΔPSE within each bucket
     subj_delta = (
-        across_for_c.groupby(["subject_key", "bucket"], dropna=False)["pse_delta"]
+        across_for_c.groupby(["participant_id", "bucket"], dropna=False)["pse_delta"]
         .median()
         .reset_index()
     )
-
-    print(subj_delta)
 
     # vectors for plotting
     w2s = subj_delta.loc[subj_delta["bucket"] == "weak2strong", "pse_delta"].to_numpy()
@@ -644,7 +623,6 @@ def plot_panels_AB(
     axC.set_xticks([0, 1])
     axC.set_xticklabels(xlabels)
     axC.set_title("C.", loc="left", fontweight="bold")
-    # axC.set_ylabel("ΔPSE = PSE − standard angle (°)")
     # keep a tidy y-range
     yvals = np.r_[w2s, s2w]
     _set_int_triplet_yticks(axC, yvals)
@@ -652,14 +630,14 @@ def plot_panels_AB(
     # ------------ Panel D: JND by trial type (subject dots + median bars) ------------
     # subject-level JND median per trial type
     jnd_subj = (
-        data.groupby(["subject_key", "trial_type"], dropna=False)["jnd"]
+        data.groupby(["participant_id", "trial_type"], dropna=False)["jnd"]
         .median()
         .reset_index()
         .rename(columns={"jnd": "jnd_med_subj"})
     )
 
     # x order of categories
-    tt_order = _order_trial_types_for_panelD(dataset, jnd_subj["trial_type"].unique().tolist())
+    tt_order = _order_trial_types_for_panelD(experiment, jnd_subj["trial_type"].unique().tolist())
 
     # prepare plotting vectors
     x_pos = {tt: i for i, tt in enumerate(tt_order)}
@@ -699,7 +677,6 @@ def plot_panels_AB(
     axD.set_xticks([x_pos[tt] for tt in tt_order])
     axD.set_xticklabels([short_label(tt) for tt in tt_order])
     axD.set_title("D.", loc="left", fontweight="bold")
-    # axD.set_ylabel("JND (°)")
 
 
     # tidy y-range
@@ -716,7 +693,7 @@ def plot_panels_AB(
         nonlocal tick_x, tick_lbl
         if df_part.empty: return
         for tt, g in df_part.groupby("trial_type", dropna=False):
-            ang_med = np.nanmedian(pd.to_numeric(g["standard_angle_abs"], errors="coerce"))
+            ang_med = np.nanmedian(pd.to_numeric(g["reference_angle_abs"], errors="coerce"))
             if np.isfinite(ang_med) and (X_MIN <= float(ang_med) <= X_MAX):
                 tick_x.append(float(ang_med))
                 tick_lbl.append(f"x{short_label(str(tt)).replace('-', '')}".lower())
@@ -730,14 +707,11 @@ def plot_panels_AB(
 
     # subject-level *median* error per bucket
     err_subj = (
-        across_for_e.groupby(["subject_key", "bucket"], dropna=False)[
+        across_for_e.groupby(["participant_id", "bucket"], dropna=False)[
             ["pse_pred_error_uncertainty", "pse_pred_error_scaling"]
         ].median()
         .reset_index()
     )
-
-    stat, p = wilcoxon(err_subj["pse_pred_error_uncertainty"].abs(), err_subj["pse_pred_error_scaling"].abs())
-    print(f"PSE prediction statistics: W = {stat:.2f}, p = {p}")
 
     # split by bucket
     w2s_u = err_subj.loc[err_subj["bucket"] == "weak2strong", "pse_pred_error_uncertainty"].to_numpy(float)
@@ -764,14 +738,6 @@ def plot_panels_AB(
     # --- Boxplots on top (two per column: weak→strong and strong→weak) ---
     off = 0.25  # horizontal offset so the two boxes per column don't overlap
 
-    # Uncertainty column (x=0)
-    # _add_box(axE, w2s_u, pos=0.00 - off, color=DOT_WEAK2STRONG)
-    # _add_box(axE, s2w_u, pos=0.00 + off, color=DOT_STRONG2WEAK)
-    #
-    # # Scaling column (x=1)
-    # _add_box(axE, w2s_s, pos=1.00 - off, color=DOT_WEAK2STRONG)
-    # _add_box(axE, s2w_s, pos=1.00 + off, color=DOT_STRONG2WEAK)
-
     # --- Single boxes per column (combine both direction buckets) ---
     u_all = np.r_[w2s_u, s2w_u]  # Uncertainty column (x=0)
     s_all = np.r_[w2s_s, s2w_s]  # Scaling     column (x=1)
@@ -781,8 +747,6 @@ def plot_panels_AB(
 
     # horizontal 0-lines: dashed for Uncertainty, solid for Scaling
     half = 0.42
-    # axE.hlines(0.0, 0.00 - half, 0.00 + half, color="k", lw=2.0, ls=(0, (3, 3)), zorder=1)  # dashed
-    # axE.hlines(0.0, 1.00 - half, 1.00 + half, color="k", lw=2.0, ls="-", zorder=1)  # solid
 
     # cosmetics
     axE.set_xticks([0, 1])
@@ -797,14 +761,11 @@ def plot_panels_AB(
     if not across.empty:
         # subject-level median errors per trial type (across-cue only)
         err_subj_f = (
-            across.groupby(["subject_key", "trial_type"], dropna=False)[
+            across.groupby(["participant_id", "trial_type"], dropna=False)[
                 ["jnd_pred_error_uncertainty", "jnd_pred_error_scaling"]
             ].median()
             .reset_index()
         )
-
-        stat, p = wilcoxon(err_subj_f["jnd_pred_error_uncertainty"].abs(), err_subj_f["jnd_pred_error_scaling"].abs())
-        print(f"JND prediction statistics: W = {stat:.2f}, p = {p}")
 
         # color per trial type (same as Panels A/B)
         colmap = trialtype_colors()
@@ -831,21 +792,6 @@ def plot_panels_AB(
                 axF.scatter(_j(1.00 + 0.2, ys_s.size), ys_s, s=22, color=col,
                             edgecolors="none", alpha=0.95, zorder=2)
 
-            # --- Boxplots per trial type on top (multiple per column) ---
-            # ttypes = sorted(err_subj_f["trial_type"].astype(str).unique().tolist()) if 'err_subj_f' in locals() else []
-            # nT = max(1, len(ttypes))
-            # # symmetric offsets around each column center; shrink if many ttypes
-            # spread = 0.12 if nT <= 4 else 0.20 if nT <= 6 else 0.16
-            # offs = np.linspace(-spread, spread, nT) if nT > 1 else np.array([0.0])
-            # colmap = trialtype_colors()
-            #
-            # for j, tt in enumerate(ttypes):
-            #     col = colmap.get(tt, matplotlib.cm.get_cmap("tab20")(6))
-            #     ys_u = err_subj_f.loc[err_subj_f["trial_type"] == tt, "jnd_pred_error_uncertainty"].to_numpy(float)
-            #     ys_s = err_subj_f.loc[err_subj_f["trial_type"] == tt, "jnd_pred_error_scaling"].to_numpy(float)
-            #     _add_box(axF, ys_u, pos=0.00 + offs[j], color=col, width=max(0.10, spread * 0.6))
-            #     _add_box(axF, ys_s, pos=1.00 + offs[j], color=col, width=max(0.10, spread * 0.6))
-
             # --- Single boxes per column (all trial types pooled) ---
             if 'err_subj_f' in locals() and not err_subj_f.empty:
                 u_all_f = err_subj_f["jnd_pred_error_uncertainty"].to_numpy(dtype=float)  # x=0
@@ -855,8 +801,6 @@ def plot_panels_AB(
 
     # horizontal 0-lines: dashed for Uncertainty, solid for Scaling
     half = 0.42
-    # axF.hlines(0.0, 0.00 - half, 0.00 + half, color="k", lw=2.0, ls=(0, (3, 3)), zorder=1)
-    # axF.hlines(0.0, 1.00 - half, 1.00 + half, color="k", lw=2.0, ls="-", zorder=1)
 
     # cosmetics
     axF.set_xticks([0, 1])
@@ -874,7 +818,6 @@ def plot_panels_AB(
         pad = 0.15 * (rngy if rngy > 0 else 1.0)
         axF.set_ylim(np.nanmin(vals_f) - pad, np.nanmax(vals_f) + pad)
 
-    # vals_f = np.r_[w2s_u_f, s2w_u_f, w2s_s_f, s2w_s_f] if 'w2s_u_f' in locals() else np.array([])
     _set_int_triplet_yticks(axF, vals_f)
 
     for ax in (axA, axB, axC, axD, axE, axF):
@@ -889,53 +832,32 @@ def plot_panels_AB(
         axB.set_xticklabels([tick_lbl[i] for i in sorted(keep)])
 
     # Global title (experiment tag)
-    title = dataset if dataset != "combined_cue" else f"combined_cue ({int(frequency)} Hz)" if frequency else "combined_cue"
-    # fig.suptitle("Psychometric Test Results — " + title, y=0.98, fontsize=14, fontweight="bold")
+    title = experiment if experiment != "combined_cue" else f"combined_cue ({int(frequency)} Hz)" if frequency else "combined_cue"
 
     # y-ticks only at 0.5 and 0.84
     for ax in (axA, axB):
         ax.set_yticks([0.5, 0.84])
         ax.set_yticklabels(["0.5", "0.84"])
 
-    if save_path:
-        sp = Path(save_path); sp.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(sp, dpi=300, bbox_inches="tight")
-
-    return fig
+    plt.show()
 
 
 # ---------- convenience runner ----------
 def save_panels_for_experiment(
     csv_path: Path | str = DEFAULT_CSV,
     *,
-    dataset: str = "combined_cue",
+    experiment: str = "combined_cue",
     frequency: Optional[float] = 1300.0,
-    out_dir: Path | str = OUT_DIR,
 ) -> Path:
     df = load_params(csv_path)
-    df = df[~(df.subject_key == "single_cue:vp_2")]
-    df = df[~(df.subject_key == "single_cue:vp_4")]
-    df = df[~(df.subject_key == "single_cue:vp_14")]
-    df = df[~(df.subject_key == "combined_cue:vp_3")]
-    df = df[~((df.subject_key == "combined_cue:vp_9") & (df.standard_center_frequency == 1300))]
-    fig = plot_panels_AB(df, dataset=dataset, frequency=frequency)
-    tag = f"{dataset}" + (f"_{int(frequency)}hz" if dataset == "combined_cue" and frequency is not None else "")
-    out = Path(out_dir) / f"{_safe(tag)}__panels_AB.svg"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    # fig.savefig(out, dpi=300, bbox_inches="tight", format="svg")
-    plt.show()
-    # plt.close(fig)
-    return out
+    plot_panels_AB(df, experiment=experiment, frequency=frequency)
 
 if __name__ == "__main__":
     # Example: combined_cue at 1300 Hz
     p = save_panels_for_experiment(
         csv_path=DEFAULT_CSV,
-        dataset="single_cue",
-        # dataset="combined_cue",
-        # frequency=500.0,
-        out_dir="Plots"
+        experiment="single_cue",
+        # experiment="combined_cue",
+        # frequency=500.0
     )
-
-    print("Saved:", p)
 

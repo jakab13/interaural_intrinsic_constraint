@@ -7,6 +7,8 @@ import numpy as np
 import psignifit as ps
 import psignifit.psigniplot as psp
 import matplotlib
+import sound_handler
+
 matplotlib.use('MacOSX')
 
 sns.set_style("white")
@@ -32,6 +34,7 @@ def get_df(subject, standard_center_frequency=None, comparison_center_frequency=
         csv_files,
         key=lambda x: os.path.getmtime(os.path.join(folder_path, x))
     )
+    # csv_files = csv_files[1:]
     # Load and combine the data into a single DataFrame
     dataframes = []
     for block_idx, file in enumerate(csv_files):
@@ -45,28 +48,28 @@ def get_df(subject, standard_center_frequency=None, comparison_center_frequency=
         combined_df = combined_df[(combined_df.standard_center_frequency == standard_center_frequency)
                 & (combined_df.comparison_center_frequency == comparison_center_frequency)]
     combined_df["is_control"] = False
-    freqs = combined_df["standard_center_frequency"].unique()
-    # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2.67) & (combined_df.trial_type == "BOTH-->BOTH"))]
-    # combined_df = combined_df[~((combined_df.comparison_angle_abs == -5) & (combined_df.trial_type == "ILD-->ILD"))]
-    # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2) & (combined_df.trial_type == "ITD-->ITD"))]
-    filtered_dataframes = []
-    for freq in freqs:
-        df_curr = combined_df[combined_df["standard_center_frequency"] == freq]
-        standard_angles = sorted(df_curr.standard_angle_abs.unique())
-        if len(standard_angles) > 1:
-            reference_angle = [s for s in standard_angles if s % 1 == 0][-1]
-            PSE_angle = [s for s in standard_angles if s != reference_angle][0]
-            df_curr.loc[(df_curr.standard_angle_abs == reference_angle) & (
-                    df_curr.trial_type == "ILD-->ILD"), "is_control"] = True
-            df_curr.loc[(df_curr.standard_angle_abs == PSE_angle) & (
-                        df_curr.trial_type == "ITD-->ITD"), "is_control"] = True
-        filtered_dataframes.append(df_curr)
-    df_final = pd.concat(filtered_dataframes, ignore_index=True)
-    return df_final
+    # freqs = combined_df["standard_center_frequency"].unique()
+    # # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2.67) & (combined_df.trial_type == "BOTH-->BOTH"))]
+    # # combined_df = combined_df[~((combined_df.comparison_angle_abs == -5) & (combined_df.trial_type == "ILD-->ILD"))]
+    # # combined_df = combined_df[~((combined_df.comparison_angle_abs == -2) & (combined_df.trial_type == "ITD-->ITD"))]
+    # filtered_dataframes = []
+    # for freq in freqs:
+    #     df_curr = combined_df[combined_df["standard_center_frequency"] == freq]
+    #     standard_angles = sorted(df_curr.standard_angle_abs.unique())
+    #     if len(standard_angles) > 1:
+    #         reference_angle = [s for s in standard_angles if s % 1 == 0][-1]
+    #         PSE_angle = [s for s in standard_angles if s != reference_angle][0]
+    #         df_curr.loc[(df_curr.standard_angle_abs == reference_angle) & (
+    #                 df_curr.trial_type == "ILD-->ILD"), "is_control"] = True
+    #         df_curr.loc[(df_curr.standard_angle_abs == PSE_angle) & (
+    #                     df_curr.trial_type == "ITD-->ITD"), "is_control"] = True
+    #     filtered_dataframes.append(df_curr)
+    # df_final = pd.concat(filtered_dataframes, ignore_index=True)
+    return combined_df
 
 
 def get_df_all(
-        exp_folder="across_frequencies",
+        # exp_folder="across_frequencies",
         subjects=None
 ):
     # folder_path = DIR / "Results" / exp_folder
@@ -74,8 +77,8 @@ def get_df_all(
     subjects = subjects or [f for f in os.listdir(folder_path) if not f.startswith('.')]
     dfs = []
     for subject in subjects:
-        df_sub = get_df(subject, exp_folder=exp_folder)
-        # df_sub = get_df(subject)
+        # df_sub = get_df(subject, exp_folder=exp_folder)
+        df_sub = get_df(subject)
         dfs.append(df_sub)
     df_all = pd.concat(dfs, ignore_index=True)
     return df_all
@@ -89,19 +92,23 @@ def get_psychometric_estimates(g, save_fig=False):
     comparison_center_frequency = g["comparison_center_frequency"].unique()[0]
     trial_type = g["trial_type"].unique()[0]
     is_control = g["is_control"].unique()[0]
+    # title = f"{subject}_ILD-normed_{standard_center_frequency}-->{comparison_center_frequency}_{trial_type}_{int(standard_angle//1)}°{int(standard_angle % 1 * 100)}'"
     title = f"{subject}_{standard_center_frequency}-->{comparison_center_frequency}_{trial_type}_{int(standard_angle//1)}°{int(standard_angle % 1 * 100)}'"
     ps_result_folder_path = DIR / Path("ps_results") / Path(subject) / f"{standard_center_frequency}-->{comparison_center_frequency}"
     Path(ps_result_folder_path).mkdir(parents=True, exist_ok=True)
     ps_result_file_path = ps_result_folder_path / Path(title + ".json")
-    # g["comparison_value_abs"] = np.where(
-    #     g["standard_angle"] < 0,
-    #     -g["comparison_value"],
-    #     g["comparison_value"]
-    # )
-    # g["comparison_value_abs"] = g["comparison_value_abs"].round(2)
+    g["comparison_value_abs"] = np.where(
+        g["standard_angle"] < 0,
+        -g["comparison_value"],
+        g["comparison_value"]
+    )
+    g["comparison_value_abs"] = g["comparison_value_abs"].round(2)
     data = g.groupby("comparison_angle_abs", as_index=False).agg(
         {"score_abs": "sum", g.columns[0]: "count"}).rename(
         columns={g.columns[0]: 'n_total'})
+    # data = g.groupby("comparison_value_abs", as_index=False).agg(
+    #     {"score_abs": "sum", g.columns[0]: "count"}).rename(
+    #     columns={g.columns[0]: 'n_total'})
     if ps_result_file_path.exists():
         res = ps.Result.load_json(ps_result_file_path)
         # print(f"Loaded psignifit estimates for {title}")
@@ -170,7 +177,7 @@ def get_psychometric_estimates(g, save_fig=False):
         "eta_ci_95_high": eta_ci_95_high,
         "slope": slope,
         "is_control": is_control,
-        # "standard_value_abs": g["standard_value"].abs().mean()
+        "standard_value_abs": g["standard_value"].abs().mean()
     }
     return pd.Series(row)
 
@@ -312,22 +319,22 @@ def unique_everseen(seq, key=None):
 def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, weak_cue="ITD", strong_cue="ILD",
              plot_parameter=True, plot_JND=False, plot_PSE_delta=False, save_fig=False):
     df = get_model_table(subject, standard_center_frequency, comparison_center_frequency)
-    df = df[~(df.is_control)]
+    # df = df[~(df.is_control)]
     trial_type_weak_to_weak = f"{weak_cue}-->{weak_cue}"
     trial_type_strong_to_strong = f"{strong_cue}-->{strong_cue}"
     trial_type_weak_to_strong = f"{weak_cue}-->{strong_cue}"
     trial_type_strong_to_weak = f"{strong_cue}-->{weak_cue}"
-    # if len(df) > 3:
-    #     JND_TT = df.loc[df.trial_type == trial_type_weak_to_weak, "JND"].values[0]
-    #     JND_LL = df.loc[df.trial_type == trial_type_strong_to_strong, "JND"].values[0]
-    #     sigma_TT = JND_TT / np.sqrt(2)
-    #     sigma_LL = JND_LL / np.sqrt(2)
-    #     # JND predictions without a prior
-    #     df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
-    #     df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
-    #     # JND predictions with IC model
-    #     df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_IC"] = JND_TT
-    #     df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_IC"] = JND_LL
+    if len(df) > 3:
+        JND_TT = df.loc[df.trial_type == trial_type_weak_to_weak, "JND"].values[0]
+        JND_LL = df.loc[df.trial_type == trial_type_strong_to_strong, "JND"].values[0]
+        sigma_TT = JND_TT / np.sqrt(2)
+        sigma_LL = JND_LL / np.sqrt(2)
+        # JND predictions without a prior
+        df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_no_prior"] = np.sqrt(sigma_LL ** 2 + sigma_TT ** 2)
+        df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_no_prior"] = np.sqrt(sigma_TT ** 2 + sigma_LL ** 2)
+        # JND predictions with IC model
+        df.loc[df.trial_type == trial_type_strong_to_weak, "JND_pred_IC"] = JND_TT
+        df.loc[df.trial_type == trial_type_weak_to_strong, "JND_pred_IC"] = JND_LL
 
     # ps_result_file_paths = [f for f in os.listdir(folder_path) if f.endswith('.json')]
     cmap = matplotlib.cm.get_cmap('tab20')
@@ -385,10 +392,10 @@ def plot_pfs(subject, standard_center_frequency, comparison_center_frequency, we
     PSE_delta_TL_pred = abs(1 - df.loc[df.trial_type == trial_type_weak_to_weak, "slope"].values[0] / df.loc[df.trial_type == trial_type_strong_to_strong, "slope"].values[0]) * PSE_TT
     PSE_delta_LT_pred = abs(1 - df.loc[df.trial_type == trial_type_strong_to_strong, "slope"].values[0] / df.loc[df.trial_type == trial_type_weak_to_weak, "slope"].values[0]) * PSE_LL
     if plot_PSE_delta:
-        # rect1 = matplotlib.patches.Rectangle((PSE_TL, 0.06), PSE_TT - PSE_TL, 0.02, color=line_kws["BOTH-->ILD"]["color"])  # color="#17BFCF"
-        # rect2 = matplotlib.patches.Rectangle((PSE_LT, 0.04), PSE_LL - PSE_LT, 0.02, color=line_kws["ILD-->BOTH"]["color"])  # color="#9FD9E4"
-        # ax_0.add_patch(rect1)
-        # ax_0.add_patch(rect2)
+        rect1 = matplotlib.patches.Rectangle((PSE_TL, 0.06), PSE_TT - PSE_TL, 0.02, color=line_kws["BOTH-->ILD"]["color"])  # color="#17BFCF"
+        rect2 = matplotlib.patches.Rectangle((PSE_LT, 0.04), PSE_LL - PSE_LT, 0.02, color=line_kws["ILD-->BOTH"]["color"])  # color="#9FD9E4"
+        ax_0.add_patch(rect1)
+        ax_0.add_patch(rect2)
 
         # y-positions: use the vertical center of your old rectangles
         y1 = 0.06 + 0.02 / 2
@@ -560,3 +567,184 @@ def plot_model_predictions():
     # g.add_legend()
     g.despine(right=True, top=True)
     plt.savefig("JND_error_combined_cue_1300.svg", format="svg")
+
+
+def plot_cue_scaling(subjects):
+    subjects = [subjects] if isinstance(subjects, str) else subjects
+    df_all = get_df_all(subjects)
+    df_all = df_all[df_all.trial_type == "ILD-->ILD"]
+    df_group = df_all.groupby(
+        ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
+    df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
+    df_slopes = sound_handler.get_ILD_slopes(freqs_of_interest=df_model.comparison_center_frequency.unique())
+    df_model = df_model.merge(df_slopes, on="standard_center_frequency")
+
+    hue_var = "comparison_center_frequency"
+
+    hue_order = sorted(df_model[hue_var].unique())
+    palette = sns.color_palette("Blues", n_colors=len(hue_order) + 2)[1:-1]
+
+    # sns.scatterplot(df_model, x="slope_db", y="JND", hue="subject")
+    # sns.lineplot(df_model, x="slope_db", y="JND", hue="subject", legend=False)
+    sns.lineplot(df_model, x="slope_db", y="JND", hue="subject",
+                 palette=sns.color_palette(['lightgrey']), lw=0.5,
+                 legend=False)
+    sns.scatterplot(df_model, x="slope_db", y="JND", hue="subject",
+                    palette=sns.color_palette(['lightgrey']),
+                    legend=False, size=0.1)
+    sns.lineplot(df_model, x="slope_db", y="JND", legend=False, color="tab:blue", lw=3)
+    # sns.lineplot(df_model, x="comparison_center_frequency", y="JND", legend=False, color="tab:blue", lw=3)
+
+
+def plot_slopes(subjects, trial_type="ILD-->ITD"):
+    subjects = [subjects] if isinstance(subjects, str) else subjects
+    df_all = get_df_all(subjects)
+    df_group = df_all.groupby(
+        ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
+    df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
+
+    df_model = df_model[df_model.trial_type == trial_type]
+
+    df_model_jnd = df_model[df_model.standard_angle_abs == 0]
+    df_model = df_model[df_model.standard_angle_abs != 0]
+    def slope_no_intercept(x, y):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        return np.sum(x * y) / np.sum(x ** 2)
+
+    hue_var = "comparison_center_frequency"
+
+    df_k_slopes = (
+        df_model.groupby(["comparison_center_frequency", "trial_type"])
+        .apply(lambda g: slope_no_intercept(g["PSE"], g["standard_value_abs"]) if g["trial_type"].any() != "ILD-->ILD" else None,
+               include_groups=True)
+        .reset_index(name="k_slope")
+    )
+
+    hue_order = sorted(df_model[hue_var].unique())
+    palette_base = {
+        "ILD-->ITD": "Oranges",
+        "ILD-->BOTH": "Greens"
+    }
+    palette = sns.color_palette(palette_base[trial_type], n_colors=len(hue_order) + 2)[1:-1]
+
+    plt.figure()
+
+    # scatter
+    sns.scatterplot(
+        data=df_model,
+        x="PSE",
+        y="standard_value_abs",
+        hue=hue_var,
+        hue_order=hue_order,
+        palette=palette,
+        legend=True
+    )
+
+    # regression lines through origin
+    x_grid = np.linspace(0, df_model["PSE"].max(), 200)
+
+    for color, h in zip(palette, hue_order):
+        slope = df_k_slopes.loc[df_k_slopes[hue_var] == h, "k_slope"].values[0]
+        y_pred = slope * x_grid
+
+        plt.plot(
+            x_grid,
+            y_pred,
+            color=color,
+            linewidth=2
+        )
+
+    plt.axhline(0, linestyle="--", color="black", linewidth=1)
+    plt.axvline(0, linestyle="--", color="black", linewidth=1)
+
+    plt.show()
+
+    plt.figure()
+
+    df_model_jnd = df_model_jnd.merge(df_k_slopes, on="comparison_center_frequency")
+    # df_model = df_model.merge(df_ITD_slopes, on="comparison_center_frequency")
+    sns.lineplot(df_model_jnd, x="k_slope", y="JND", color="tab:orange", lw=3)
+
+    plt.show()
+
+
+def plot_all_JNDs(subjects):
+    subjects = [subjects] if isinstance(subjects, str) else subjects
+    df_all = get_df_all(subjects)
+    df_group = df_all.groupby(
+        ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
+    df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
+    df_model_jnd = df_model[df_model.standard_angle_abs == 0].copy()
+
+    df_model_jnd = df_model_jnd[df_model_jnd.standard_center_frequency < 2000]
+
+    sns.lineplot(df_model_jnd,
+                 x="comparison_center_frequency",
+                 y="JND",
+                 hue="trial_type",
+                 hue_order=["ILD-->ILD", "ILD-->ITD", "ILD-->BOTH"])
+
+def plot_k_slopes(subjects):
+    subjects = [subjects] if isinstance(subjects, str) else subjects
+    df_all = get_df_all(subjects)
+    df_group = df_all.groupby(
+        ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
+    df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
+
+    df_model = df_model[df_model.comparison_center_frequency < 2000]
+
+    def slope_no_intercept(x, y):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        return np.sum(x * y) / np.sum(x ** 2)
+
+    df_k_slopes = (
+        df_model[df_model.trial_type != "ILD-->ILD"].groupby(["comparison_center_frequency", "trial_type"])
+        .apply(lambda g: slope_no_intercept(g["PSE"], g["standard_value_abs"]),
+               include_groups=True)
+        .reset_index(name="k_slope")
+    )
+
+    df_ILD_k_slopes = sound_handler.get_ILD_slopes(freqs_of_interest=df_model.comparison_center_frequency.unique())
+    df_ILD_k_slopes = df_ILD_k_slopes.rename(columns={
+        "standard_center_frequency": "comparison_center_frequency",
+        "slope_db": "k_slope"})
+    df_ILD_k_slopes["trial_type"] = "ILD-->ILD"
+
+    df_k_slopes = df_k_slopes.loc[~(df_k_slopes.k_slope == 0)]
+
+    df_k_slopes = pd.concat([df_k_slopes, df_ILD_k_slopes])
+    df_k_slope_pivot = pd.pivot(df_k_slopes, index='comparison_center_frequency', columns='trial_type', values='k_slope')
+    df_k_slope_pivot["combined_single_cues"] = df_k_slope_pivot["ILD-->ILD"] + df_k_slope_pivot["ILD-->ILD"]
+
+    sns.lineplot(df_k_slope_pivot, x="comparison_center_frequency", y="ILD-->ILD", color="tab:blue")
+    sns.lineplot(df_k_slope_pivot, x="comparison_center_frequency", y="ILD-->ITD", color="tab:orange")
+    sns.lineplot(df_k_slope_pivot, x="comparison_center_frequency", y="ILD-->BOTH", color="tab:green")
+    sns.scatterplot(df_k_slope_pivot, x="comparison_center_frequency", y="ILD-->ILD", color="tab:blue")
+    sns.scatterplot(df_k_slope_pivot, x="comparison_center_frequency", y="ILD-->ITD", color="tab:orange")
+    sns.scatterplot(df_k_slope_pivot, x="comparison_center_frequency", y="ILD-->BOTH", color="tab:green")
+
+    df_model = df_model.merge(df_k_slopes, on=["comparison_center_frequency", "trial_type"])
+
+    x_vals = np.linspace(0, df_model["PSE"].max(), 100)
+    def plot_slope_lines(data, color, **kwargs):
+        # one line per row (or per condition inside facet)
+        for _, row in data.iterrows():
+            slope = row["k_slope"]  # or "slope_db"
+            y = slope * x_vals
+            plt.plot(x_vals, y, color=color)
+
+    g = sns.FacetGrid(
+        df_model,
+        col="comparison_center_frequency",
+        col_wrap=4,
+        hue="trial_type",
+        hue_order=["ILD-->ILD", "ILD-->ITD"],
+        sharex=True,
+        sharey=True
+    )
+    g.map(sns.scatterplot, "PSE", "standard_value_abs")
+    g.map_dataframe(plot_slope_lines)
+    g.add_legend()
+    g.set(xlim=(0, None))

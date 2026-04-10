@@ -1,41 +1,47 @@
+from utils import azimuth_from_ild
 from experiment import Experiment
 from experiment_analysis import *
 
-subject = "jakab_high_ILD"
+subject = "jakab_ITD_slopes_4"
 
 exp = Experiment(subject)
 
 # exp.mixing_gain = 1
+exp.standard_center_frequency = 1300
+exp.comparison_center_frequency = 1300
+exp.head_radius = 9.00 # in cm
 
-exp.standard_center_frequency = 10000
-exp.comparison_center_frequency = 2000
-exp.head_radius = 8.08 # in cm
-reference_angle = 3.5
-PSE_estimate = 8  # initial guess of PSE
+target_ild_db = 2.0
+reference_angle = azimuth_from_ild(target_ild_db, exp.standard_center_frequency)
+PSE_estimate = 0  # initial guess of PSE
 
 # Familiarisation (without saving data)
 # exp.n_reps = 1
 # exp.run_sequence(save=False)
 
 # Number of repetitions for one sequence
-exp.n_reps = 4  # should be an even number
+exp.n_reps = 8  # should be an even number
 
 # ITD-->BOTH =====================================
 exp.standard_cue = "ILD"
-exp.comparison_cue = "ILD"
+exp.comparison_cue = "BOTH"
 exp.standard_angle = reference_angle
 exp.PSE_angle = PSE_estimate
 exp.run_sequence()
 
 # Plot psychometric functions
-plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ILD", strong_cue="ILD")
+plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ITD", strong_cue="ILD")
 
-PSE_estimate = get_PSE(subject, "ILD", "ILD", reference_angle, exp.standard_center_frequency)
+plot_cue_scaling(subject)
+
+plot_slopes(subject)
+
+PSE_estimate = get_PSE(subject, "ITD", "BOTH", reference_angle, exp.standard_center_frequency)
 
 
 # 1 ITD-->ITD =====================================
-exp.standard_cue = "ILD"
-exp.comparison_cue = "ILD"
+exp.standard_cue = "ITD"
+exp.comparison_cue = "ITD"
 exp.standard_angle = reference_angle
 exp.PSE_angle = reference_angle
 exp.run_sequence()
@@ -47,8 +53,8 @@ exp.run_sequence()
 
 
 # 2 BOTH-->BOTH =====================================
-exp.standard_cue = "BOTH"
-exp.comparison_cue = "BOTH"
+exp.standard_cue = "ILD"
+exp.comparison_cue = "ILD"
 exp.standard_angle = PSE_estimate
 exp.PSE_angle = PSE_estimate
 exp.run_sequence()
@@ -59,8 +65,8 @@ ask_to_continue()
 # plot_pfs(subject, exp.standard_center_frequency, exp.comparison_center_frequency, weak_cue="ITD", strong_cue="BOTH")
 
 # 3 BOTH-->ITD =====================================
-exp.standard_cue = "BOTH"
-exp.comparison_cue = "ILD"
+exp.standard_cue = "ILD"
+exp.comparison_cue = "ITD"
 exp.standard_angle = PSE_estimate
 exp.PSE_angle = reference_angle
 exp.run_sequence()

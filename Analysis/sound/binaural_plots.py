@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use("MacOSX")  # for PyCharm on macOS
 import matplotlib.pyplot as plt
 import slab
+import pandas as pd
 
 matplotlib.rcParams.update({
     "font.family": "sans-serif",
@@ -13,7 +14,7 @@ matplotlib.rcParams.update({
 })
 
 # --- paths ---
-ILS_PATH = "ils_jakab.pickle"
+ILS_PATH = "ils_jakab_new.pickle"
 
 # --- load ILS (interaural level spectrum) ---
 with open(ILS_PATH, "rb") as f:
@@ -26,7 +27,11 @@ azimuths = np.linspace(0, 30, 1000)
 
 # Frequencies you want
 # freqs_of_interest = [500, 1300, 1800]
-freqs_of_interest = [150, 250, 500, 750, 1000, 1250, 1500]
+# freqs_of_interest = [500, 750, 1000, 1250, 1500]
+# freqs_of_interest = [400, 600, 800, 1000, 4000, 6000]
+# freqs_of_interest = [500, 600, 700, 800, 900]
+
+freqs_of_interest = [(i + 1) * 300 for i in range(8)]
 
 def azimuth_to_ild(azimuth, frequency=2000, ils=None):
     level_diffs_left = ils['level_diffs_left']
@@ -48,6 +53,8 @@ def ild_from_ils(azis_deg: np.ndarray, freq_hz: float, ils_dict: dict) -> np.nda
     for a in azis_deg:
         left_db, right_db = azimuth_to_ild(a, frequency=freq_hz, ils=ils_dict)
         ild_vals.append(right_db - left_db)
+        # ild_curr = slab.Binaural.azimuth_to_ild(a, frequency=freq_hz, ils=ils)
+        # ild_vals.append(ild_curr)
     return np.asarray(ild_vals, dtype=float)
 
 def ild_left_from_ils(azis_deg: np.ndarray, freq_hz: float, ils_dict: dict) -> np.ndarray:
@@ -71,16 +78,43 @@ def itd_from_slab(azis_deg: np.ndarray, freq_hz: float) -> np.ndarray:
     return np.asarray([slab.Binaural.azimuth_to_itd(a, frequency=freq_hz) for a in azis_deg], dtype=float)
 
 
+def ild_slope_at_zero_fit(
+    freq_hz: float,
+    ils_dict: dict,
+    azis_deg: np.ndarray = np.array([-20, -15, -10, -5, 5, 10, 15, 20], dtype=float)
+) -> float:
+    """
+    Local linear-fit estimate of the slope of ILD(azimuth) at 0 degrees.
+
+    Returns slope in dB/degree.
+    """
+    ild_vals = ild_from_ils(azis_deg=azis_deg, freq_hz=freq_hz, ils_dict=ils_dict)
+
+    slope, intercept = np.polyfit(azis_deg, ild_vals, 1)
+    return float(slope)
+
+
+df_slopes = pd.DataFrame({
+    "standard_center_frequency": freqs_of_interest,
+    "slope_db": [
+        ild_slope_at_zero_fit(freq_hz=f, ils_dict=ils) for f in freqs_of_interest
+    ]
+})
+
+print(df_slopes)
+
+
 # ---------- compute curves ----------
 ild_curves = {f: ild_from_ils(azimuths, f, ils) for f in freqs_of_interest}
 itd_curves = {f: itd_from_slab(azimuths, f) for f in freqs_of_interest}
 
-ild_curves_left = {f: ild_left_from_ils(azimuths, f, ils) for f in freqs_of_interest}
-ild_curves_right = {f: ild_right_from_ils(azimuths, f, ils) for f in freqs_of_interest}
+# ild_curves_left = {f: ild_left_from_ils(azimuths, f, ils) for f in freqs_of_interest}
+# ild_curves_right = {f: ild_right_from_ils(azimuths, f, ils) for f in freqs_of_interest}
 
 # ---------- colour control (THIS IS THE KEY PART) ----------
 blue_cmap   = plt.get_cmap("Blues")
 orange_cmap = plt.get_cmap("Oranges")
+green_cmap = plt.get_cmap("Greens")
 
 # choose perceptually balanced intensities (avoid very light & very dark)
 blue_levels   = np.linspace(0.2, 0.8, len(freqs_of_interest))

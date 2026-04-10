@@ -5,7 +5,7 @@ import slab
 import numpy as np
 import datetime
 import time
-from data_handler import generate_trial_sequence, get_columns
+from data_handler import generate_trial_sequence, get_columns, add_ITD_trials
 from sound_handler import generate_stim, apply_cue
 from utils import get_response
 
@@ -32,11 +32,18 @@ class Experiment:
     def run_sequence(self, save=True):
         trial_seq = generate_trial_sequence(
             self.standard_angle,
+            self.standard_center_frequency,
             self.PSE_angle,
             self.standard_cue,
             self.comparison_cue,
             self.n_reps
         )
+        # trial_seq = add_ITD_trials(
+        #     trial_seq,
+        #     self.standard_angle,
+        #     self.standard_cue,
+        #     self.n_reps
+        # )
         trial_seq = trial_seq.sample(frac=1).reset_index(drop=True)
         if save:
             results_table = slab.ResultsTable(columns=self.columns, subject=self.subject)
@@ -64,10 +71,12 @@ class Experiment:
             # Randomise presentation of the two stimuli
             presentations = [standard_stim, comparison_stim]
             order = np.random.permutation(len(presentations))
+            # distractor_noise = slab.Binaural.pinknoise(kind="dichotic", duration=self.ISI, samplerate=standard_stim.samplerate)
             for i, idx in enumerate(order):
                 current_stim = presentations[idx]
                 current_stim.play()
                 if i == 0:
+                    # distractor_noise.play()
                     time.sleep(self.ISI)
 
             datetime_offset = datetime.datetime.now()

@@ -2,8 +2,9 @@ import slab
 import pickle
 import numpy as np
 import copy
+import pandas as pd
 
-ils = pickle.load(open('ils_jakab.pickle', 'rb'))
+ils = pickle.load(open('ils_jakab_new.pickle', 'rb'))
 
 
 def make_interaural_level_spectrum():
@@ -40,7 +41,7 @@ def make_interaural_level_spectrum():
 # ils = make_interaural_level_spectrum()
 
 
-def azimuth_to_ild(azimuth, frequency=2000, ils=None):
+def azimuth_to_ild(azimuth, frequency=2000., ils=None):
     level_diffs_left = ils['level_diffs_left']
     level_diffs_right = ils['level_diffs_right']
     # levels = [np.interp(azimuth, ils['azimuths'], level_diffs[i, :]) for i in range(level_diffs.shape[0])]
@@ -85,3 +86,41 @@ def generate_stim(center_frequency, mixing_gain=0.5, level=80):
     stim.level += level_diff
     stim.level -= 3
     return stim
+
+
+def ild_from_ils(azis_deg, freq_hz, ils_dict=ils):
+    azis_deg = [azis_deg] if isinstance(azis_deg, float) else azis_deg
+    ild_vals = []
+    for a in azis_deg:
+        left_db, right_db = azimuth_to_ild(a, frequency=freq_hz, ils=ils_dict)
+        ild_vals.append(right_db - left_db)
+    return np.asarray(ild_vals, dtype=float)
+
+
+def ild_slope_at_zero_fit(
+    freq_hz: float,
+    ils_dict: dict,
+    azis_deg: np.ndarray = np.array([(i - 9) * 5 for i in range(19)], dtype=float)
+) -> float:
+    """
+    Local linear-fit estimate of the slope of ILD(azimuth) at 0 degrees.
+
+    Returns slope in dB/degree.
+    """
+    ild_vals = ild_from_ils(azis_deg=azis_deg, freq_hz=freq_hz, ils_dict=ils_dict)
+
+    slope, intercept = np.polyfit(azis_deg, ild_vals, 1)
+    return float(slope)
+
+
+def get_ILD_slopes(freqs_of_interest=[200, 400, 600, 800, 1000, 4000, 6000, 8000]):
+    df_slopes = pd.DataFrame({
+        "standard_center_frequency": freqs_of_interest,
+        "slope_db": [
+            ild_slope_at_zero_fit(
+                freq_hz=f,
+                ils_dict=ils,
+            ) for f in freqs_of_interest
+        ]
+    })
+    return df_slopes

@@ -593,6 +593,8 @@ def plot_cue_scaling(subjects):
                     palette=sns.color_palette(['lightgrey']),
                     legend=False, size=0.1)
     sns.lineplot(df_model, x="slope_db", y="JND", legend=False, color="tab:blue", lw=3)
+    sns.scatterplot(df_model, x="slope_db", y="JND", hue="comparison_center_frequency", palette=palette, s=80,
+                    zorder=10)
     # sns.lineplot(df_model, x="comparison_center_frequency", y="JND", legend=False, color="tab:blue", lw=3)
 
 
@@ -664,7 +666,9 @@ def plot_slopes(subjects, trial_type="ILD-->ITD"):
 
     df_model_jnd = df_model_jnd.merge(df_k_slopes, on="comparison_center_frequency")
     # df_model = df_model.merge(df_ITD_slopes, on="comparison_center_frequency")
-    sns.lineplot(df_model_jnd, x="k_slope", y="JND", color="tab:orange", lw=3)
+    df_model_jnd_filt = df_model_jnd[df_model_jnd.comparison_center_frequency > 200]
+    sns.lineplot(df_model_jnd_filt, x="k_slope", y="JND", color=palette[int(len(palette) / 2) + 1], lw=3)
+    sns.scatterplot(df_model_jnd_filt, x="k_slope", y="JND", hue="comparison_center_frequency", palette=palette, s=80, zorder=10)
 
     plt.show()
 
@@ -684,6 +688,7 @@ def plot_all_JNDs(subjects):
                  y="JND",
                  hue="trial_type",
                  hue_order=["ILD-->ILD", "ILD-->ITD", "ILD-->BOTH"])
+
 
 def plot_k_slopes(subjects):
     subjects = [subjects] if isinstance(subjects, str) else subjects
@@ -740,7 +745,7 @@ def plot_k_slopes(subjects):
         col="comparison_center_frequency",
         col_wrap=4,
         hue="trial_type",
-        hue_order=["ILD-->ILD", "ILD-->ITD"],
+        hue_order=["ILD-->ILD", "ILD-->ITD", "ILD-->BOTH"],
         sharex=True,
         sharey=True
     )
@@ -748,3 +753,170 @@ def plot_k_slopes(subjects):
     g.map_dataframe(plot_slope_lines)
     g.add_legend()
     g.set(xlim=(0, None))
+
+
+def plot_inverse_regression(
+    subjects,
+    ax=None,
+    annotate=True,
+    n_line_points=300
+):
+    """
+    Plot scatter points and category-wise inverse regression fits of the form:
+        y = c / x
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing x, y, and category columns.
+    x_col, y_col, cat_col : str
+        Column names for x, y, and category.
+    ax : matplotlib.axes.Axes or None
+        Existing axes to draw on. If None, creates a new figure.
+    annotate : bool
+        Whether to print fitted constants on the figure.
+    n_line_points : int
+        Number of points used to draw the fitted curve.
+
+    Returns
+    -------
+    results_df : pandas.DataFrame
+        Table with fitted constants per category.
+    ax : matplotlib.axes.Axes
+        The plot axes.
+    """
+    subjects = [subjects] if isinstance(subjects, str) else subjects
+    df_all = get_df_all(subjects)
+    df_group = df_all.groupby(
+        ["subject", "standard_angle_abs", "standard_center_frequency", "comparison_center_frequency", "trial_type"])
+    df_model = df_group.apply(lambda g: get_psychometric_estimates(g, save_fig=True), include_groups=True).reset_index()
+
+    def slope_no_intercept(x, y):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        return np.sum(x * y) / np.sum(x ** 2)
+
+
+    df_k_slopes = (
+        df_model[df_model.trial_type != "ILD-->ILD"].groupby(["comparison_center_frequency", "trial_type"])
+        .apply(lambda g: slope_no_intercept(g["PSE"], g["standard_value_abs"]),
+               include_groups=True)
+        .reset_index(name="k_slope")
+    )
+
+    df_ILD_k_slopes = sound_handler.get_ILD_slopes(freqs_of_interest=df_model.comparison_center_frequency.unique())
+    df_ILD_k_slopes = df_ILD_k_slopes.rename(columns={
+        "standard_center_frequency": "comparison_center_frequency",
+        "slope_db": "k_slope"})
+    df_ILD_k_slopes["trial_type"] = "ILD-->ILD"
+
+    df_k_slopes = df_k_slopes.loc[~(df_k_slopes.k_slope == 0)]
+
+    df_k_slopes = pd.concat([df_k_slopes, df_ILD_k_slopes])
+
+    df_model = df_model.merge(df_k_slopes, on=["comparison_center_frequency", "trial_type"])
+
+    df_model = df_model[df_model.standard_angle_abs == 0]
+
+    df_model = df_model[~(df_model.trial_type == "ILD-->BOTH")]
+
+    df_model = df_model.replace({"ILD-->ILD": "ILD", "ILD-->ITD": "ITD"})
+
+    # Basic validation
+
+    x_col = "k_slope"
+    y_col = "JND"
+    cat_col = "trial_type"
+
+    # Remove invalid rows for 1/x
+    plot_df = df_model[[x_col, y_col, cat_col]].copy()
+    plot_df = plot_df.replace([np.inf, -np.inf], np.nan).dropna()
+
+    if (plot_df[x_col] == 0).any():
+        raise ValueError(f"Column '{x_col}' contains zeros, so 1/x is undefined.")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 6))
+
+    # Scatter points
+    sns.scatterplot(
+        data=plot_df,
+        x=x_col,
+        y=y_col,
+        hue=cat_col,
+        hue_order=["ILD", "ITD"],
+        ax=ax,
+        s=60,
+        alpha=0.5
+    )
+
+    # Reuse seaborn's assigned colors from legend handles if possible
+    handles, labels = ax.get_legend_handles_labels()
+    color_map = {}
+    if labels and labels[0] == cat_col:
+        handles, labels = handles[1:], labels[1:]
+    for h, lab in zip(handles, labels):
+        try:
+            color_map[lab] = h.get_facecolor()[0]
+        except Exception:
+            pass
+
+    results = []
+
+    categories = plot_df[cat_col].unique()
+
+    for cat in ["ILD", "ITD"]:
+        sub = plot_df[plot_df[cat_col] == cat].copy()
+        x = sub[x_col].to_numpy(dtype=float)
+        y = sub[y_col].to_numpy(dtype=float)
+
+        z = 1.0 / x
+
+        # Least-squares estimate for y = c * z
+        denom = np.sum(z**2)
+        if denom == 0:
+            c_hat = np.nan
+        else:
+            c_hat = np.sum(z * y) / denom
+
+        results.append({
+            cat_col: cat,
+            "constant": c_hat,
+            "n": len(sub)
+        })
+
+        # Draw fitted curve over that category's x range
+        x_line = np.linspace(x.min(), x.max(), n_line_points)
+        y_line = c_hat / x_line
+
+        ax.plot(
+            x_line,
+            y_line,
+            color=color_map.get(cat, None),
+            linewidth=2
+        )
+
+    results_df = pd.DataFrame(results)
+
+    # Annotate fitted constants on the figure
+    if annotate and not results_df.empty:
+        text_lines = [
+            f"{row[cat_col]}: c = {row['constant']:.3f}"
+            for _, row in results_df.iterrows()
+        ]
+        text = "\n".join(text_lines)
+
+        ax.text(
+            1.02, 0.98,
+            text,
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+        )
+
+    ax.set_title("Category-wise inverse regression: y = c / x")
+    ax.legend(title=cat_col, bbox_to_anchor=(1.02, 0.5), loc="center left")
+    plt.tight_layout()
+
+    return results_df, ax

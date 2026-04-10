@@ -36,6 +36,8 @@ plot_cue_scaling(subject)
 
 plot_slopes(subject)
 
+plot_inverse_regression(subject)
+
 PSE_estimate = get_PSE(subject, "ITD", "BOTH", reference_angle, exp.standard_center_frequency)
 
 
